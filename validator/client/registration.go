@@ -29,6 +29,8 @@ func SubmitValidatorRegistrations(
 		return nil
 	}
 
+	log.Info("Submitting validator registration settings for custom builders to beacon chain")
+	//log.Infof("Submitting %v validator registration settings", signedRegs)
 	if _, err := validatorClient.SubmitValidatorRegistrations(ctx, &ethpb.SignedValidatorRegistrationsV1{
 		Messages: signedRegs,
 	}); err != nil {
@@ -93,6 +95,12 @@ func (v *validator) SignValidatorRegistrationRequest(ctx context.Context, signer
 func isValidatorRegistrationSame(cachedVR *ethpb.ValidatorRegistrationV1, newVR *ethpb.ValidatorRegistrationV1) bool {
 	isSame := true
 	if cachedVR.GasLimit != newVR.GasLimit {
+		isSame = false
+	}
+	if cachedVR.Timestamp != newVR.Timestamp {
+		isSame = false
+	}
+	if cachedVR.ProposerCommitment != newVR.ProposerCommitment {
 		isSame = false
 	}
 	if hexutil.Encode(cachedVR.FeeRecipient) != hexutil.Encode(newVR.FeeRecipient) {

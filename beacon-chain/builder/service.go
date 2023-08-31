@@ -132,6 +132,8 @@ func (s *Service) Status() error {
 // RegisterValidator registers a validator with the builder relay network.
 // It also saves the registration object to the DB.
 func (s *Service) RegisterValidator(ctx context.Context, reg []*ethpb.SignedValidatorRegistrationV1) error {
+	log.Infof("DEBUG: In Service RegisterValidator: Registering %d validators with the builder relay network", len(reg))
+	//log.Infof("DEBUG: In Service RegisterValidator: Requests are %v", reg)
 	ctx, span := trace.StartSpan(ctx, "builder.RegisterValidator")
 	defer span.End()
 	start := time.Now()

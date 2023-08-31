@@ -149,6 +149,16 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 			builderGetPayloadMissCount.Inc()
 			log.WithError(err).Error("Could not get builder payload")
 		}
+		localPayloadValue, err := localPayload.ValueInGwei()
+		if err != nil {
+			log.WithError(err).Error("Could not get local payload value")
+		}
+		builderPayloadValue, err := builderPayload.ValueInGwei()
+		if err != nil {
+			log.WithError(err).Error("Could not get builder payload value")
+		}
+		log.Infof("DEBUG: Local payload value is %d\n", localPayloadValue)
+		log.Infof("DEBUG: Builder payload value is %d\n", builderPayloadValue)
 		if err := setExecutionData(ctx, sBlk, localPayload, builderPayload); err != nil {
 			return nil, status.Errorf(codes.Internal, "Could not set execution data: %v", err)
 		}
@@ -241,6 +251,23 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 	if err != nil {
 		builderGetPayloadMissCount.Inc()
 		log.WithError(err).Error("Could not get builder payload")
+	}
+	if localPayload != nil {
+		localPayloadValue, err := localPayload.ValueInGwei()
+		if err != nil {
+			log.WithError(err).Error("Could not get local payload value")
+		}
+		log.Infof("DEBUG: Local payload value is %d\n", localPayloadValue)
+	}
+
+	if builderPayload != nil {
+		builderPayloadValue, err := builderPayload.ValueInGwei()
+		if err != nil {
+			log.WithError(err).Error("Could not get builder payload value")
+		}
+		log.Infof("DEBUG: Builder payload value is %d\n", builderPayloadValue)
+	} else {
+		log.Infof("DEBUG: Builder payload is nil\n")
 	}
 
 	if err := setExecutionData(ctx, sBlk, localPayload, builderPayload); err != nil {
@@ -411,6 +438,8 @@ func (vs *Server) computeStateRoot(ctx context.Context, block interfaces.ReadOnl
 
 // SubmitValidatorRegistrations submits validator registrations.
 func (vs *Server) SubmitValidatorRegistrations(ctx context.Context, reg *ethpb.SignedValidatorRegistrationsV1) (*emptypb.Empty, error) {
+	log.Infof("Calling SubmitValidatorRegistrations in vs *Server")
+	log.Infof("reg: %v", reg)
 	if vs.BlockBuilder == nil || !vs.BlockBuilder.Configured() {
 		return &emptypb.Empty{}, status.Errorf(codes.InvalidArgument, "Could not register block builder: %v", builder.ErrNoBuilder)
 	}

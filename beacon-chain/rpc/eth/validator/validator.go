@@ -764,10 +764,11 @@ func (vs *Server) SubmitValidatorRegistration(ctx context.Context, reg *ethpbv1.
 		message := reg.Registrations[i].Message
 		registrations = append(registrations, &ethpbalpha.SignedValidatorRegistrationV1{
 			Message: &ethpbalpha.ValidatorRegistrationV1{
-				FeeRecipient: message.FeeRecipient,
-				GasLimit:     message.GasLimit,
-				Timestamp:    message.Timestamp,
-				Pubkey:       message.Pubkey,
+				FeeRecipient:       message.FeeRecipient,
+				GasLimit:           message.GasLimit,
+				Timestamp:          message.Timestamp,
+				Pubkey:             message.Pubkey,
+				ProposerCommitment: message.ProposerCommitment,
 			},
 			Signature: registration.Signature,
 		})

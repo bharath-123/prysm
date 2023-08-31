@@ -57,6 +57,8 @@ type BuilderConfig struct {
 	Enabled  bool             `json:"enabled" yaml:"enabled"`
 	GasLimit validator.Uint64 `json:"gas_limit,omitempty" yaml:"gas_limit,omitempty"`
 	Relays   []string         `json:"relays,omitempty" yaml:"relays,omitempty"`
+	// TODO - bchain - The user should be able to configure it
+	ProposerCommitment uint64 `json:"proposer_commitment,omitempty" yaml:"proposer_commitment,omitempty"`
 }
 
 // ToBuilderConfig converts protobuf to a builder config used in inmemory storage
@@ -65,8 +67,9 @@ func ToBuilderConfig(from *validatorpb.BuilderConfig) *BuilderConfig {
 		return nil
 	}
 	config := &BuilderConfig{
-		Enabled:  from.Enabled,
-		GasLimit: from.GasLimit,
+		Enabled:            from.Enabled,
+		GasLimit:           from.GasLimit,
+		ProposerCommitment: from.ProposerCommitment,
 	}
 	if from.Relays != nil {
 		relays := make([]string, len(from.Relays))
@@ -173,6 +176,7 @@ func (bc *BuilderConfig) Clone() *BuilderConfig {
 	config := &BuilderConfig{}
 	config.Enabled = bc.Enabled
 	config.GasLimit = bc.GasLimit
+	config.ProposerCommitment = bc.ProposerCommitment
 	var relays []string
 	if bc.Relays != nil {
 		relays = make([]string, len(bc.Relays))
@@ -196,6 +200,7 @@ func (bc *BuilderConfig) ToPayload() *validatorpb.BuilderConfig {
 		config.Relays = relays
 	}
 	config.GasLimit = bc.GasLimit
+	config.ProposerCommitment = bc.ProposerCommitment
 	return config
 }
 

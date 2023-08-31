@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	errKeymanagerNotSupported = "keymanager kind not supported: %s"
+	errKeymanagerNotSupported = "keymanager kind not at all supported: %s"
 	// ErrCouldNotInitializeKeymanager informs about failed keymanager initialization
 	ErrCouldNotInitializeKeymanager = "could not initialize keymanager"
 )

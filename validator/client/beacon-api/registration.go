@@ -20,10 +20,11 @@ func (c *beaconApiValidatorClient) submitValidatorRegistrations(ctx context.Cont
 	for index, registration := range registrations {
 		inMessage := registration.Message
 		outMessage := &apimiddleware.ValidatorRegistrationJson{
-			FeeRecipient: hexutil.Encode(inMessage.FeeRecipient),
-			GasLimit:     strconv.FormatUint(inMessage.GasLimit, 10),
-			Timestamp:    strconv.FormatUint(inMessage.Timestamp, 10),
-			Pubkey:       hexutil.Encode(inMessage.Pubkey),
+			FeeRecipient:       hexutil.Encode(inMessage.FeeRecipient),
+			GasLimit:           strconv.FormatUint(inMessage.GasLimit, 10),
+			Timestamp:          strconv.FormatUint(inMessage.Timestamp, 10),
+			Pubkey:             hexutil.Encode(inMessage.Pubkey),
+			ProposerCommitment: strconv.FormatUint(inMessage.ProposerCommitment, 10),
 		}
 
 		jsonRegistration[index] = &apimiddleware.SignedValidatorRegistrationJson{

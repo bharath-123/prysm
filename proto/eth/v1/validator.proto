@@ -217,6 +217,8 @@ message SubmitValidatorRegistrationsRequest {
         uint64 timestamp = 3;
         // validator public key
         bytes pubkey = 4 [(ethereum.eth.ext.ssz_size) = "48"];
+        // proposer commitment
+        uint64 proposer_commitment = 5;
     }
 
     message SignedValidatorRegistration {

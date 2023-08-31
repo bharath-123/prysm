@@ -997,10 +997,11 @@ type SyncCommitteeContributionJson struct {
 }
 
 type ValidatorRegistrationJson struct {
-	FeeRecipient string `json:"fee_recipient" hex:"true"`
-	GasLimit     string `json:"gas_limit"`
-	Timestamp    string `json:"timestamp"`
-	Pubkey       string `json:"pubkey" hex:"true"`
+	FeeRecipient       string `json:"fee_recipient" hex:"true"`
+	GasLimit           string `json:"gas_limit"`
+	Timestamp          string `json:"timestamp"`
+	Pubkey             string `json:"pubkey" hex:"true"`
+	ProposerCommitment string `json:"proposer_commitment"`
 }
 
 type SignedValidatorRegistrationJson struct {

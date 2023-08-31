@@ -55,15 +55,17 @@ func (r *SignedValidatorRegistration) UnmarshalJSON(b []byte) error {
 // MarshalJSON returns a json representation copy of validator registration.
 func (r *ValidatorRegistration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		FeeRecipient hexutil.Bytes `json:"fee_recipient"`
-		GasLimit     string        `json:"gas_limit"`
-		Timestamp    string        `json:"timestamp"`
-		Pubkey       hexutil.Bytes `json:"pubkey"`
+		FeeRecipient       hexutil.Bytes `json:"fee_recipient"`
+		GasLimit           string        `json:"gas_limit"`
+		Timestamp          string        `json:"timestamp"`
+		Pubkey             hexutil.Bytes `json:"pubkey"`
+		ProposerCommitment string        `json:"proposer_commitment"`
 	}{
-		FeeRecipient: r.FeeRecipient,
-		GasLimit:     fmt.Sprintf("%d", r.GasLimit),
-		Timestamp:    fmt.Sprintf("%d", r.Timestamp),
-		Pubkey:       r.Pubkey,
+		FeeRecipient:       r.FeeRecipient,
+		GasLimit:           fmt.Sprintf("%d", r.GasLimit),
+		Timestamp:          fmt.Sprintf("%d", r.Timestamp),
+		Pubkey:             r.Pubkey,
+		ProposerCommitment: fmt.Sprintf("%d", r.ProposerCommitment),
 	})
 }
 
@@ -73,10 +75,11 @@ func (r *ValidatorRegistration) UnmarshalJSON(b []byte) error {
 		r.ValidatorRegistrationV1 = &eth.ValidatorRegistrationV1{}
 	}
 	o := struct {
-		FeeRecipient hexutil.Bytes `json:"fee_recipient"`
-		GasLimit     string        `json:"gas_limit"`
-		Timestamp    string        `json:"timestamp"`
-		Pubkey       hexutil.Bytes `json:"pubkey"`
+		FeeRecipient       hexutil.Bytes `json:"fee_recipient"`
+		GasLimit           string        `json:"gas_limit"`
+		Timestamp          string        `json:"timestamp"`
+		Pubkey             hexutil.Bytes `json:"pubkey"`
+		ProposerCommitment string        `json:"proposer_commitment"`
 	}{}
 	if err := json.Unmarshal(b, &o); err != nil {
 		return err
@@ -90,6 +93,9 @@ func (r *ValidatorRegistration) UnmarshalJSON(b []byte) error {
 	}
 	if r.Timestamp, err = strconv.ParseUint(o.Timestamp, 10, 64); err != nil {
 		return errors.Wrap(err, "failed to parse timestamp")
+	}
+	if r.ProposerCommitment, err = strconv.ParseUint(o.ProposerCommitment, 10, 64); err != nil {
+		return errors.Wrap(err, "failed to parse proposer commitment")
 	}
 
 	return nil

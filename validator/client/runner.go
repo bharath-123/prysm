@@ -35,6 +35,7 @@ var backOffPeriod = 10 * time.Second
 func run(ctx context.Context, v iface.Validator) {
 	cleanup := v.Done
 	defer cleanup()
+	log.Info("Starting validator client")
 
 	headSlot, err := initializeValidatorAndGetHeadSlot(ctx, v)
 	if err != nil {
@@ -113,6 +114,8 @@ func run(ctx context.Context, v iface.Validator) {
 			if slots.IsEpochStart(slot) && v.ProposerSettings() != nil {
 				go func() {
 					// deadline set for 1 epoch from call to not overlap.
+					// log a line saying we are pushing proposer settings
+					log.Info("Pushing proposer settings at epoch start")
 					epochDeadline := v.SlotDeadline(slot + params.BeaconConfig().SlotsPerEpoch - 1)
 					if err := v.PushProposerSettings(ctx, km, slot, epochDeadline); err != nil {
 						log.WithError(err).Warn("Failed to update proposer settings")

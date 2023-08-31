@@ -146,11 +146,12 @@ func (c *Client) do(ctx context.Context, method string, path string, body io.Rea
 	}()
 
 	u := c.baseURL.ResolveReference(&url.URL{Path: path})
-
+	log.Infof("DEBUG: Sending request to %s", u.String())
 	span.AddAttributes(trace.StringAttribute("url", u.String()),
 		trace.StringAttribute("method", method))
 
 	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	log.Infof("DEBUG: Built http request")
 	if err != nil {
 		return
 	}
@@ -163,10 +164,15 @@ func (c *Client) do(ctx context.Context, method string, path string, body io.Rea
 			return
 		}
 	}
+	log.Infoln("DEBUG: Sending http request")
 	r, err := c.hc.Do(req)
 	if err != nil {
+		log.Infof("DEBUG: http error is %s\n", err.Error())
 		return
 	}
+	log.Infof("DEBUG: Received http response")
+	log.Infof("DEBUG: Response status code: %d", r.StatusCode)
+	log.Infof("DEBUG; Response status: %s", r.Status)
 	defer func() {
 		closeErr := r.Body.Close()
 		if closeErr != nil {
@@ -175,6 +181,7 @@ func (c *Client) do(ctx context.Context, method string, path string, body io.Rea
 	}()
 	if r.StatusCode != http.StatusOK {
 		err = non200Err(r)
+		log.Infof("DEBUG: no200Err is %s\n", err.Error())
 		return
 	}
 	res, err = io.ReadAll(r.Body)
@@ -248,6 +255,7 @@ func (c *Client) GetHeader(ctx context.Context, slot primitives.Slot, parentHash
 // RegisterValidator encodes the SignedValidatorRegistrationV1 message to json (including hex-encoding the byte
 // fields with 0x prefixes) and posts to the builder validator registration endpoint.
 func (c *Client) RegisterValidator(ctx context.Context, svr []*ethpb.SignedValidatorRegistrationV1) error {
+	log.Infof("Debug: Client: RegisterValidator: Registering validator %v", svr)
 	ctx, span := trace.StartSpan(ctx, "builder.client.RegisterValidator")
 	defer span.End()
 	span.AddAttributes(trace.Int64Attribute("num_reqs", int64(len(svr))))
@@ -259,9 +267,12 @@ func (c *Client) RegisterValidator(ctx context.Context, svr []*ethpb.SignedValid
 	}
 	vs := make([]*SignedValidatorRegistration, len(svr))
 	for i := 0; i < len(svr); i++ {
+		//log.Infof("validator object is %v\n", svr[i].Message)
+		//log.Infof("Registering validator %s with proposer commitment %d", svr[i].Message.Pubkey, svr[i].Message.ProposerCommitment)
 		vs[i] = &SignedValidatorRegistration{SignedValidatorRegistrationV1: svr[i]}
 	}
 	body, err := json.Marshal(vs)
+	//log.Infof("sending the following json: %s\n", string(body))
 	if err != nil {
 		err := errors.Wrap(err, "error encoding the SignedValidatorRegistration value body in RegisterValidator")
 		tracing.AnnotateError(span, err)
@@ -269,6 +280,11 @@ func (c *Client) RegisterValidator(ctx context.Context, svr []*ethpb.SignedValid
 	}
 
 	_, err = c.do(ctx, http.MethodPost, postRegisterValidatorPath, bytes.NewBuffer(body))
+	if err != nil {
+		log.Infof("DEBUG: Client: RegisterValidator: Error while registering validator %s", err.Error())
+	} else {
+		log.Infof("DEBUG: Client: RegisterValidator: Successfully registered validator")
+	}
 	return err
 }
 

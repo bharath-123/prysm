@@ -65,10 +65,7 @@ container_image(
 container_bundle(
     name = "image_bundle",
     images = {
-        "gcr.io/prysmaticlabs/prysm/beacon-chain:latest": ":image_with_creation_time",
-        "gcr.io/prysmaticlabs/prysm/beacon-chain:{DOCKER_TAG}": ":image_with_creation_time",
-        "index.docker.io/prysmaticlabs/prysm-beacon-chain:latest": ":image_with_creation_time",
-        "index.docker.io/prysmaticlabs/prysm-beacon-chain:{DOCKER_TAG}": ":image_with_creation_time",
+        "public.ecr.aws/t1d5h1w5/prysm-pepc-beacon-chain:latest": ":image_with_creation_time",
     },
     tags = ["manual"],
     visibility = ["//beacon-chain:__pkg__"],
@@ -84,10 +81,7 @@ go_image_debug(
 container_bundle(
     name = "image_bundle_debug",
     images = {
-        "gcr.io/prysmaticlabs/prysm/beacon-chain:latest-debug": ":image_debug",
-        "gcr.io/prysmaticlabs/prysm/beacon-chain:{DOCKER_TAG}-debug": ":image_debug",
-        "index.docker.io/prysmaticlabs/prysm-beacon-chain:latest-debug": ":image_debug",
-        "index.docker.io/prysmaticlabs/prysm-beacon-chain:{DOCKER_TAG}-debug": ":image_debug",
+        "public.ecr.aws/t1d5h1w5/prysm-pepc-beacon-chain:latest-debug": ":image_debug",
     },
     tags = ["manual"],
     visibility = ["//beacon-chain:__pkg__"],

@@ -119,6 +119,7 @@ message BuilderConfig {
   bool enabled = 1;
   uint64 gas_limit = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/validator.Uint64"];
   repeated string relays = 3;
+  uint64 proposer_commitment = 4;
 }
 
 // ProposerSettingsPayload is used to unmarshal files sent from the validator flag as well as safe to bolt db bucket

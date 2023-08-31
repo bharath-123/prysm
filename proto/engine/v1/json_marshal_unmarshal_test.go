@@ -491,13 +491,13 @@ func TestExecutionPayloadBody_MarshalUnmarshalJSON(t *testing.T) {
 	pBody := &enginev1.ExecutionPayloadBodyV1{
 		Transactions: [][]byte{[]byte("random1"), []byte("random2"), []byte("random3")},
 		Withdrawals: []*enginev1.Withdrawal{
-			&enginev1.Withdrawal{
+			{
 				Index:          200,
 				ValidatorIndex: 20303,
 				Amount:         3200000000,
 				Address:        bytesutil.PadTo([]byte("junk"), 20),
 			},
-			&enginev1.Withdrawal{
+			{
 				Index:          200,
 				ValidatorIndex: 70303,
 				Amount:         3200000800,

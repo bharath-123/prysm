@@ -123,6 +123,8 @@ func (c *beaconApiValidatorClient) SubmitSyncMessage(ctx context.Context, in *et
 }
 
 func (c *beaconApiValidatorClient) SubmitValidatorRegistrations(ctx context.Context, in *ethpb.SignedValidatorRegistrationsV1) (*empty.Empty, error) {
+	log.Infof("calling SubmitValidatorRegistrations in beaconApiValidatorClient")
+	log.Infof("in.Messages: %v", in.Messages)
 	return new(empty.Empty), c.submitValidatorRegistrations(ctx, in.Messages)
 }
 

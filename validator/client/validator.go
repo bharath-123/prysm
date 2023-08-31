@@ -1035,6 +1035,11 @@ func (v *validator) PushProposerSettings(ctx context.Context, km keymanager.IKey
 	if err != nil {
 		return err
 	}
+	// log out the signedRegReqs
+	//for _, signedRegReq := range signedRegReqs {
+	//	log.Infof("DEBUG: SignedRegReq: %v", signedRegReq)
+	//}
+	log.Infof("Submitting %d validator registrations", len(signedRegReqs))
 	if err := SubmitValidatorRegistrations(ctx, v.validatorClient, signedRegReqs); err != nil {
 		return errors.Wrap(ErrBuilderValidatorRegistration, err.Error())
 	}
@@ -1176,18 +1181,23 @@ func (v *validator) buildSignedRegReqs(ctx context.Context, pubkeys [][fieldpara
 			continue
 		}
 
+		timestamp := uint64(time.Now().UTC().Unix())
+		log.Infof("DEBUG: current time is %d\n", timestamp)
 		req := &ethpb.ValidatorRegistrationV1{
-			FeeRecipient: feeRecipient[:],
-			GasLimit:     gasLimit,
-			Timestamp:    uint64(time.Now().UTC().Unix()),
-			Pubkey:       pubkeys[i][:],
+			FeeRecipient:       feeRecipient[:],
+			GasLimit:           gasLimit,
+			Timestamp:          timestamp,
+			Pubkey:             pubkeys[i][:],
+			ProposerCommitment: 1,
 		}
+		log.Infof("DEBUG: Timestamp in ValidatorRegistrationV1 in buildSignedReq: %+v\n", req.GetTimestamp())
 
 		signedReq, err := v.SignValidatorRegistrationRequest(ctx, signer, req)
 		if err != nil {
 			log.WithFields(logrus.Fields{
-				"pubkey":       fmt.Sprintf("%#x", req.Pubkey),
-				"feeRecipient": feeRecipient,
+				"pubkey":             fmt.Sprintf("%#x", req.Pubkey),
+				"feeRecipient":       feeRecipient,
+				"proposerCommitment": req.ProposerCommitment,
 			}).Error(err)
 			continue
 		}
@@ -1196,8 +1206,9 @@ func (v *validator) buildSignedRegReqs(ctx context.Context, pubkeys [][fieldpara
 
 		if hexutil.Encode(feeRecipient.Bytes()) == params.BeaconConfig().EthBurnAddressHex {
 			log.WithFields(logrus.Fields{
-				"pubkey":       fmt.Sprintf("%#x", req.Pubkey),
-				"feeRecipient": feeRecipient,
+				"pubkey":             fmt.Sprintf("%#x", req.Pubkey),
+				"feeRecipient":       feeRecipient,
+				"proposerCommitment": req.ProposerCommitment,
 			}).Warn("Fee recipient is burn address")
 		}
 	}
