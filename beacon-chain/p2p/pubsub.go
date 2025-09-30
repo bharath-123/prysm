@@ -34,7 +34,7 @@ const (
 	gossipSubFanoutTTL = 60000000000 // TTL for fanout maps for topics we are not subscribed to but have published to, in nano seconds
 
 	// heartbeat interval
-	gossipSubHeartbeatInterval = 700 * time.Millisecond // frequency of heartbeat, milliseconds
+	gossipSubHeartbeatInterval = 1400 * time.Millisecond // frequency of heartbeat, milliseconds
 
 	// misc
 	rSubD = 8 // random gossip target
