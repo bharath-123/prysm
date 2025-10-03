@@ -98,8 +98,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
-github.com/bharath-123/go-libp2p-pubsub v0.0.0-20251003060233-c0c59b9bb33e h1:AdoxPNcPdzYpgxFhqmMukLP1aejNOtiE/H5jCvX2qLw=
-github.com/bharath-123/go-libp2p-pubsub v0.0.0-20251003060233-c0c59b9bb33e/go.mod h1:XIVDFkHZ+7myc4YBNeGgAqRdZmQ1+aBDgSd1D7bGf4U=
+github.com/bharath-123/go-libp2p-pubsub v0.0.0-20251003071020-15cd1b326741 h1:mOb5YQ3FKato4gBDXYShHnOof3Rjb/e4fAH5xDFJBHk=
+github.com/bharath-123/go-libp2p-pubsub v0.0.0-20251003071020-15cd1b326741/go.mod h1:XIVDFkHZ+7myc4YBNeGgAqRdZmQ1+aBDgSd1D7bGf4U=
 github.com/bits-and-blooms/bitset v1.17.0 h1:1X2TS7aHz1ELcC0yU1y2stUs/0ig5oMU6STFZGrhvHI=
 github.com/bits-and-blooms/bitset v1.17.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bradfitz/go-smtpd v0.0.0-20170404230938-deb6d6237625/go.mod h1:HYsPBTaaSFSlLx/70C2HPIMNZpVV8+vt/A+FMnYP11g=
