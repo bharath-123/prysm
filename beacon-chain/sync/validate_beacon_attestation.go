@@ -12,6 +12,9 @@ import (
 
 	// "github.com/OffchainLabs/prysm/v6/beacon-chain/blockchain"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/blocks"
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed"
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed/operation"
+
 	// "github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed"
 	// "github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed/operation"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/helpers"
@@ -97,7 +100,7 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 	// 	return pubsub.ValidationReject, err
 	// }
 
-	// committeeIndex := att.GetCommitteeIndex()
+	committeeIndex := att.GetCommitteeIndex()
 
 	// // Generate cache key for unaggregated attestation tracking
 	// attKey, err := generateUnaggregatedAttCacheKey(att)
@@ -135,57 +138,57 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 	// 	return pubsub.ValidationReject, err
 	// }
 
-	// preState, err := s.cfg.chain.AttestationTargetState(ctx, data.Target)
-	// if err != nil {
-	// 	tracing.AnnotateError(span, err)
-	// 	return pubsub.ValidationIgnore, err
-	// }
+	preState, err := s.cfg.chain.AttestationTargetState(ctx, data.Target)
+	if err != nil {
+		tracing.AnnotateError(span, err)
+		return pubsub.ValidationIgnore, err
+	}
 
 	// validationRes, err := s.validateUnaggregatedAttTopic(ctx, att, preState, *msg.Topic)
 	// if validationRes != pubsub.ValidationAccept {
 	// 	return validationRes, err
 	// }
 
-	// committee, err := helpers.BeaconCommitteeFromState(ctx, preState, data.Slot, committeeIndex)
-	// if err != nil {
-	// 	tracing.AnnotateError(span, err)
-	// 	return pubsub.ValidationIgnore, err
-	// }
+	committee, err := helpers.BeaconCommitteeFromState(ctx, preState, data.Slot, committeeIndex)
+	if err != nil {
+		tracing.AnnotateError(span, err)
+		return pubsub.ValidationIgnore, err
+	}
 
 	// validationRes, err = validateAttesterData(ctx, att, committee)
 	// if validationRes != pubsub.ValidationAccept {
 	// 	return validationRes, err
 	// }
 
-	// // Consolidated handling of Electra SingleAttestation vs Phase0 unaggregated attestation
-	// var (
-	// 	attForValidation eth.Att // what we'll pass to further validation
-	// 	eventType        feed.EventType
-	// 	eventData        interface{}
-	// )
+	// Consolidated handling of Electra SingleAttestation vs Phase0 unaggregated attestation
+	var (
+		attForValidation eth.Att // what we'll pass to further validation
+		eventType        feed.EventType
+		eventData        interface{}
+	)
 
-	// if att.Version() >= version.Electra {
-	// 	singleAtt, ok := att.(*eth.SingleAttestation)
-	// 	if !ok {
-	// 		return pubsub.ValidationIgnore, fmt.Errorf(
-	// 			"attestation has wrong type (expected %T, got %T)",
-	// 			&eth.SingleAttestation{}, att,
-	// 		)
-	// 	}
-	// 	// Convert Electra SingleAttestation to unaggregated ElectraAttestation. This is needed because many parts of the codebase assume that attestations have a certain structure and SingleAttestation validates these assumptions.
-	// 	attForValidation = singleAtt.ToAttestationElectra(committee)
-	// 	eventType = operation.SingleAttReceived
-	// 	eventData = &operation.SingleAttReceivedData{
-	// 		Attestation: singleAtt,
-	// 	}
-	// } else {
-	// 	// Phase0 unaggregated attestation
-	// 	attForValidation = att
-	// 	eventType = operation.UnaggregatedAttReceived
-	// 	eventData = &operation.UnAggregatedAttReceivedData{
-	// 		Attestation: att,
-	// 	}
-	// }
+	if att.Version() >= version.Electra {
+		singleAtt, ok := att.(*eth.SingleAttestation)
+		if !ok {
+			return pubsub.ValidationIgnore, fmt.Errorf(
+				"attestation has wrong type (expected %T, got %T)",
+				&eth.SingleAttestation{}, att,
+			)
+		}
+		// Convert Electra SingleAttestation to unaggregated ElectraAttestation. This is needed because many parts of the codebase assume that attestations have a certain structure and SingleAttestation validates these assumptions.
+		attForValidation = singleAtt.ToAttestationElectra(committee)
+		eventType = operation.SingleAttReceived
+		eventData = &operation.SingleAttReceivedData{
+			Attestation: singleAtt,
+		}
+	} else {
+		// Phase0 unaggregated attestation
+		attForValidation = att
+		eventType = operation.UnaggregatedAttReceived
+		eventData = &operation.UnAggregatedAttReceivedData{
+			Attestation: att,
+		}
+	}
 
 	// validationRes, err = s.validateUnaggregatedAttWithState(ctx, attForValidation, preState)
 	// if validationRes != pubsub.ValidationAccept {
@@ -222,15 +225,15 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 	// }
 
 	// // Notify other services in the beacon node
-	// s.cfg.attestationNotifier.OperationFeed().Send(&feed.Event{
-	// 	Type: eventType,
-	// 	Data: eventData,
-	// })
+	s.cfg.attestationNotifier.OperationFeed().Send(&feed.Event{
+		Type: eventType,
+		Data: eventData,
+	})
 
 	// s.setSeenUnaggregatedAtt(attKey)
 
 	// // Attach final validated attestation to the message for further pipeline use
-	// msg.ValidatorData = attForValidation
+	msg.ValidatorData = attForValidation
 
 	return pubsub.ValidationAccept, nil
 }
