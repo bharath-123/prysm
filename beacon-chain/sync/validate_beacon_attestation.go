@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
+
 	// "time"
 
 	// "github.com/OffchainLabs/prysm/v6/beacon-chain/blockchain"
@@ -14,13 +16,16 @@ import (
 	// "github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed/operation"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p"
+
 	// "github.com/OffchainLabs/prysm/v6/beacon-chain/slasher/types"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
+
 	// "github.com/OffchainLabs/prysm/v6/encoding/bytesutil"
 	"github.com/OffchainLabs/prysm/v6/monitoring/tracing"
 	"github.com/OffchainLabs/prysm/v6/monitoring/tracing/trace"
 	eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
+
 	// "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1/attestation"
 	"github.com/OffchainLabs/prysm/v6/runtime/version"
 	"github.com/OffchainLabs/prysm/v6/time/slots"
@@ -40,47 +45,47 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 	pid peer.ID,
 	msg *pubsub.Message,
 ) (pubsub.ValidationResult, error) {
-	// start := time.Now()
-	// defer func() {
-	// 	attestationVerificationGossipSummary.Observe(float64(time.Since(start).Milliseconds()))
-	// }()
+	start := time.Now()
+	defer func() {
+		attestationVerificationGossipSummary.Observe(float64(time.Since(start).Milliseconds()))
+	}()
 
-	// if pid == s.cfg.p2p.PeerID() {
-	// 	return pubsub.ValidationAccept, nil
-	// }
-	// // Attestation processing requires the target block to be present in the database, so we'll skip
-	// // validating or processing attestations until fully synced.
-	// if s.cfg.initialSync.Syncing() {
-	// 	return pubsub.ValidationIgnore, nil
-	// }
+	if pid == s.cfg.p2p.PeerID() {
+		return pubsub.ValidationAccept, nil
+	}
+	// Attestation processing requires the target block to be present in the database, so we'll skip
+	// validating or processing attestations until fully synced.
+	if s.cfg.initialSync.Syncing() {
+		return pubsub.ValidationIgnore, nil
+	}
 
-	// ctx, span := trace.StartSpan(ctx, "sync.validateCommitteeIndexBeaconAttestation")
-	// defer span.End()
+	ctx, span := trace.StartSpan(ctx, "sync.validateCommitteeIndexBeaconAttestation")
+	defer span.End()
 
-	// if msg.Topic == nil {
-	// 	return pubsub.ValidationReject, p2p.ErrInvalidTopic
-	// }
+	if msg.Topic == nil {
+		return pubsub.ValidationReject, p2p.ErrInvalidTopic
+	}
 
-	// m, err := s.decodePubsubMessage(msg)
-	// if err != nil {
-	// 	tracing.AnnotateError(span, err)
-	// 	return pubsub.ValidationReject, err
-	// }
+	m, err := s.decodePubsubMessage(msg)
+	if err != nil {
+		tracing.AnnotateError(span, err)
+		return pubsub.ValidationReject, err
+	}
 
-	// att, ok := m.(eth.Att)
-	// if !ok {
-	// 	return pubsub.ValidationReject, errWrongMessage
-	// }
-	// if err := helpers.ValidateNilAttestation(att); err != nil {
-	// 	return pubsub.ValidationReject, err
-	// }
+	att, ok := m.(eth.Att)
+	if !ok {
+		return pubsub.ValidationReject, errWrongMessage
+	}
+	if err := helpers.ValidateNilAttestation(att); err != nil {
+		return pubsub.ValidationReject, err
+	}
 
-	// data := att.GetData()
+	data := att.GetData()
 
-	// // Do not process slot 0 attestations.
-	// if data.Slot == 0 {
-	// 	return pubsub.ValidationIgnore, nil
-	// }
+	// Do not process slot 0 attestations.
+	if data.Slot == 0 {
+		return pubsub.ValidationIgnore, nil
+	}
 
 	// // Attestation's slot is within ATTESTATION_PROPAGATION_SLOT_RANGE and early attestation
 	// // processing tolerance.
