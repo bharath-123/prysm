@@ -139,6 +139,12 @@ var (
 			Help: "Time to verify gossiped attestations",
 		},
 	)
+	attestationArrivalGossipSummary = promauto.NewSummary(
+		prometheus.SummaryOpts{
+			Name: "gossip_attestation_arrival_milliseconds",
+			Help: "Time for gossiped attestations to arrive",
+		},
+	)
 	blockVerificationGossipSummary = promauto.NewSummary(
 		prometheus.SummaryOpts{
 			Name: "gossip_block_verification_milliseconds",
