@@ -6,22 +6,22 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
+	// "time"
 
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/blockchain"
+	// "github.com/OffchainLabs/prysm/v6/beacon-chain/blockchain"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/blocks"
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed"
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed/operation"
+	// "github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed"
+	// "github.com/OffchainLabs/prysm/v6/beacon-chain/core/feed/operation"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p"
-	"github.com/OffchainLabs/prysm/v6/beacon-chain/slasher/types"
+	// "github.com/OffchainLabs/prysm/v6/beacon-chain/slasher/types"
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
-	"github.com/OffchainLabs/prysm/v6/encoding/bytesutil"
+	// "github.com/OffchainLabs/prysm/v6/encoding/bytesutil"
 	"github.com/OffchainLabs/prysm/v6/monitoring/tracing"
 	"github.com/OffchainLabs/prysm/v6/monitoring/tracing/trace"
 	eth "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
-	"github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1/attestation"
+	// "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1/attestation"
 	"github.com/OffchainLabs/prysm/v6/runtime/version"
 	"github.com/OffchainLabs/prysm/v6/time/slots"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -40,192 +40,192 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 	pid peer.ID,
 	msg *pubsub.Message,
 ) (pubsub.ValidationResult, error) {
-	start := time.Now()
-	defer func() {
-		attestationVerificationGossipSummary.Observe(float64(time.Since(start).Milliseconds()))
-	}()
+	// start := time.Now()
+	// defer func() {
+	// 	attestationVerificationGossipSummary.Observe(float64(time.Since(start).Milliseconds()))
+	// }()
 
-	if pid == s.cfg.p2p.PeerID() {
-		return pubsub.ValidationAccept, nil
-	}
-	// Attestation processing requires the target block to be present in the database, so we'll skip
-	// validating or processing attestations until fully synced.
-	if s.cfg.initialSync.Syncing() {
-		return pubsub.ValidationIgnore, nil
-	}
+	// if pid == s.cfg.p2p.PeerID() {
+	// 	return pubsub.ValidationAccept, nil
+	// }
+	// // Attestation processing requires the target block to be present in the database, so we'll skip
+	// // validating or processing attestations until fully synced.
+	// if s.cfg.initialSync.Syncing() {
+	// 	return pubsub.ValidationIgnore, nil
+	// }
 
-	ctx, span := trace.StartSpan(ctx, "sync.validateCommitteeIndexBeaconAttestation")
-	defer span.End()
+	// ctx, span := trace.StartSpan(ctx, "sync.validateCommitteeIndexBeaconAttestation")
+	// defer span.End()
 
-	if msg.Topic == nil {
-		return pubsub.ValidationReject, p2p.ErrInvalidTopic
-	}
+	// if msg.Topic == nil {
+	// 	return pubsub.ValidationReject, p2p.ErrInvalidTopic
+	// }
 
-	m, err := s.decodePubsubMessage(msg)
-	if err != nil {
-		tracing.AnnotateError(span, err)
-		return pubsub.ValidationReject, err
-	}
+	// m, err := s.decodePubsubMessage(msg)
+	// if err != nil {
+	// 	tracing.AnnotateError(span, err)
+	// 	return pubsub.ValidationReject, err
+	// }
 
-	att, ok := m.(eth.Att)
-	if !ok {
-		return pubsub.ValidationReject, errWrongMessage
-	}
-	if err := helpers.ValidateNilAttestation(att); err != nil {
-		return pubsub.ValidationReject, err
-	}
+	// att, ok := m.(eth.Att)
+	// if !ok {
+	// 	return pubsub.ValidationReject, errWrongMessage
+	// }
+	// if err := helpers.ValidateNilAttestation(att); err != nil {
+	// 	return pubsub.ValidationReject, err
+	// }
 
-	data := att.GetData()
+	// data := att.GetData()
 
-	// Do not process slot 0 attestations.
-	if data.Slot == 0 {
-		return pubsub.ValidationIgnore, nil
-	}
+	// // Do not process slot 0 attestations.
+	// if data.Slot == 0 {
+	// 	return pubsub.ValidationIgnore, nil
+	// }
 
-	// Attestation's slot is within ATTESTATION_PROPAGATION_SLOT_RANGE and early attestation
-	// processing tolerance.
-	if err := helpers.ValidateAttestationTime(data.Slot, s.cfg.clock.GenesisTime(), earlyAttestationProcessingTolerance); err != nil {
-		tracing.AnnotateError(span, err)
-		return pubsub.ValidationIgnore, err
-	}
-	if err := helpers.ValidateSlotTargetEpoch(data); err != nil {
-		return pubsub.ValidationReject, err
-	}
+	// // Attestation's slot is within ATTESTATION_PROPAGATION_SLOT_RANGE and early attestation
+	// // processing tolerance.
+	// if err := helpers.ValidateAttestationTime(data.Slot, s.cfg.clock.GenesisTime(), earlyAttestationProcessingTolerance); err != nil {
+	// 	tracing.AnnotateError(span, err)
+	// 	return pubsub.ValidationIgnore, err
+	// }
+	// if err := helpers.ValidateSlotTargetEpoch(data); err != nil {
+	// 	return pubsub.ValidationReject, err
+	// }
 
-	committeeIndex := att.GetCommitteeIndex()
+	// committeeIndex := att.GetCommitteeIndex()
 
-	// Generate cache key for unaggregated attestation tracking
-	attKey, err := generateUnaggregatedAttCacheKey(att)
-	if err != nil {
-		log.WithError(err).Error("Could not generate cache key for attestation tracking")
-		return pubsub.ValidationIgnore, nil
-	}
+	// // Generate cache key for unaggregated attestation tracking
+	// attKey, err := generateUnaggregatedAttCacheKey(att)
+	// if err != nil {
+	// 	log.WithError(err).Error("Could not generate cache key for attestation tracking")
+	// 	return pubsub.ValidationIgnore, nil
+	// }
 
-	if !s.slasherEnabled {
-		// Verify this the first attestation received for the participating validator for the slot.
-		if s.hasSeenUnaggregatedAtt(attKey) {
-			return pubsub.ValidationIgnore, nil
-		}
-		// Reject an attestation if it references an invalid block.
-		if s.hasBadBlock(bytesutil.ToBytes32(data.BeaconBlockRoot)) ||
-			s.hasBadBlock(bytesutil.ToBytes32(data.Target.Root)) ||
-			s.hasBadBlock(bytesutil.ToBytes32(data.Source.Root)) {
-			attBadBlockCount.Inc()
-			return pubsub.ValidationReject, errors.New("attestation data references bad block root")
-		}
-	}
+	// if !s.slasherEnabled {
+	// 	// Verify this the first attestation received for the participating validator for the slot.
+	// 	if s.hasSeenUnaggregatedAtt(attKey) {
+	// 		return pubsub.ValidationIgnore, nil
+	// 	}
+	// 	// Reject an attestation if it references an invalid block.
+	// 	if s.hasBadBlock(bytesutil.ToBytes32(data.BeaconBlockRoot)) ||
+	// 		s.hasBadBlock(bytesutil.ToBytes32(data.Target.Root)) ||
+	// 		s.hasBadBlock(bytesutil.ToBytes32(data.Source.Root)) {
+	// 		attBadBlockCount.Inc()
+	// 		return pubsub.ValidationReject, errors.New("attestation data references bad block root")
+	// 	}
+	// }
 
-	// Verify the block being voted and the processed state is in beaconDB and the block has passed validation if it's in the beaconDB.
-	blockRoot := bytesutil.ToBytes32(data.BeaconBlockRoot)
-	if !s.hasBlockAndState(ctx, blockRoot) {
-		s.savePendingAtt(att)
-	}
-	if !s.cfg.chain.InForkchoice(blockRoot) {
-		tracing.AnnotateError(span, blockchain.ErrNotDescendantOfFinalized)
-		return pubsub.ValidationIgnore, blockchain.ErrNotDescendantOfFinalized
-	}
-	if err = s.cfg.chain.VerifyLmdFfgConsistency(ctx, att); err != nil {
-		tracing.AnnotateError(span, err)
-		attBadLmdConsistencyCount.Inc()
-		return pubsub.ValidationReject, err
-	}
+	// // Verify the block being voted and the processed state is in beaconDB and the block has passed validation if it's in the beaconDB.
+	// blockRoot := bytesutil.ToBytes32(data.BeaconBlockRoot)
+	// if !s.hasBlockAndState(ctx, blockRoot) {
+	// 	s.savePendingAtt(att)
+	// }
+	// if !s.cfg.chain.InForkchoice(blockRoot) {
+	// 	tracing.AnnotateError(span, blockchain.ErrNotDescendantOfFinalized)
+	// 	return pubsub.ValidationIgnore, blockchain.ErrNotDescendantOfFinalized
+	// }
+	// if err = s.cfg.chain.VerifyLmdFfgConsistency(ctx, att); err != nil {
+	// 	tracing.AnnotateError(span, err)
+	// 	attBadLmdConsistencyCount.Inc()
+	// 	return pubsub.ValidationReject, err
+	// }
 
-	preState, err := s.cfg.chain.AttestationTargetState(ctx, data.Target)
-	if err != nil {
-		tracing.AnnotateError(span, err)
-		return pubsub.ValidationIgnore, err
-	}
+	// preState, err := s.cfg.chain.AttestationTargetState(ctx, data.Target)
+	// if err != nil {
+	// 	tracing.AnnotateError(span, err)
+	// 	return pubsub.ValidationIgnore, err
+	// }
 
-	validationRes, err := s.validateUnaggregatedAttTopic(ctx, att, preState, *msg.Topic)
-	if validationRes != pubsub.ValidationAccept {
-		return validationRes, err
-	}
+	// validationRes, err := s.validateUnaggregatedAttTopic(ctx, att, preState, *msg.Topic)
+	// if validationRes != pubsub.ValidationAccept {
+	// 	return validationRes, err
+	// }
 
-	committee, err := helpers.BeaconCommitteeFromState(ctx, preState, data.Slot, committeeIndex)
-	if err != nil {
-		tracing.AnnotateError(span, err)
-		return pubsub.ValidationIgnore, err
-	}
+	// committee, err := helpers.BeaconCommitteeFromState(ctx, preState, data.Slot, committeeIndex)
+	// if err != nil {
+	// 	tracing.AnnotateError(span, err)
+	// 	return pubsub.ValidationIgnore, err
+	// }
 
-	validationRes, err = validateAttesterData(ctx, att, committee)
-	if validationRes != pubsub.ValidationAccept {
-		return validationRes, err
-	}
+	// validationRes, err = validateAttesterData(ctx, att, committee)
+	// if validationRes != pubsub.ValidationAccept {
+	// 	return validationRes, err
+	// }
 
-	// Consolidated handling of Electra SingleAttestation vs Phase0 unaggregated attestation
-	var (
-		attForValidation eth.Att // what we'll pass to further validation
-		eventType        feed.EventType
-		eventData        interface{}
-	)
+	// // Consolidated handling of Electra SingleAttestation vs Phase0 unaggregated attestation
+	// var (
+	// 	attForValidation eth.Att // what we'll pass to further validation
+	// 	eventType        feed.EventType
+	// 	eventData        interface{}
+	// )
 
-	if att.Version() >= version.Electra {
-		singleAtt, ok := att.(*eth.SingleAttestation)
-		if !ok {
-			return pubsub.ValidationIgnore, fmt.Errorf(
-				"attestation has wrong type (expected %T, got %T)",
-				&eth.SingleAttestation{}, att,
-			)
-		}
-		// Convert Electra SingleAttestation to unaggregated ElectraAttestation. This is needed because many parts of the codebase assume that attestations have a certain structure and SingleAttestation validates these assumptions.
-		attForValidation = singleAtt.ToAttestationElectra(committee)
-		eventType = operation.SingleAttReceived
-		eventData = &operation.SingleAttReceivedData{
-			Attestation: singleAtt,
-		}
-	} else {
-		// Phase0 unaggregated attestation
-		attForValidation = att
-		eventType = operation.UnaggregatedAttReceived
-		eventData = &operation.UnAggregatedAttReceivedData{
-			Attestation: att,
-		}
-	}
+	// if att.Version() >= version.Electra {
+	// 	singleAtt, ok := att.(*eth.SingleAttestation)
+	// 	if !ok {
+	// 		return pubsub.ValidationIgnore, fmt.Errorf(
+	// 			"attestation has wrong type (expected %T, got %T)",
+	// 			&eth.SingleAttestation{}, att,
+	// 		)
+	// 	}
+	// 	// Convert Electra SingleAttestation to unaggregated ElectraAttestation. This is needed because many parts of the codebase assume that attestations have a certain structure and SingleAttestation validates these assumptions.
+	// 	attForValidation = singleAtt.ToAttestationElectra(committee)
+	// 	eventType = operation.SingleAttReceived
+	// 	eventData = &operation.SingleAttReceivedData{
+	// 		Attestation: singleAtt,
+	// 	}
+	// } else {
+	// 	// Phase0 unaggregated attestation
+	// 	attForValidation = att
+	// 	eventType = operation.UnaggregatedAttReceived
+	// 	eventData = &operation.UnAggregatedAttReceivedData{
+	// 		Attestation: att,
+	// 	}
+	// }
 
-	validationRes, err = s.validateUnaggregatedAttWithState(ctx, attForValidation, preState)
-	if validationRes != pubsub.ValidationAccept {
-		return validationRes, err
-	}
+	// validationRes, err = s.validateUnaggregatedAttWithState(ctx, attForValidation, preState)
+	// if validationRes != pubsub.ValidationAccept {
+	// 	return validationRes, err
+	// }
 
-	if s.slasherEnabled {
-		// Feed the indexed attestation to slasher if enabled. This action
-		// is done in the background to avoid adding more load to this critical code path.
-		go func() {
-			// Using a different context to prevent timeouts as this operation can be expensive
-			// and we want to avoid affecting the critical code path.
-			ctx := context.TODO()
-			preState, err := s.cfg.chain.AttestationTargetState(ctx, data.Target)
-			if err != nil {
-				log.WithError(err).Error("Could not retrieve pre state")
-				tracing.AnnotateError(span, err)
-				return
-			}
-			committee, err := helpers.BeaconCommitteeFromState(ctx, preState, data.Slot, committeeIndex)
-			if err != nil {
-				log.WithError(err).Error("Could not get attestation committee")
-				tracing.AnnotateError(span, err)
-				return
-			}
-			indexedAtt, err := attestation.ConvertToIndexed(ctx, attForValidation, committee)
-			if err != nil {
-				log.WithError(err).Error("Could not convert to indexed attestation")
-				tracing.AnnotateError(span, err)
-				return
-			}
-			s.cfg.slasherAttestationsFeed.Send(&types.WrappedIndexedAtt{IndexedAtt: indexedAtt})
-		}()
-	}
+	// if s.slasherEnabled {
+	// 	// Feed the indexed attestation to slasher if enabled. This action
+	// 	// is done in the background to avoid adding more load to this critical code path.
+	// 	go func() {
+	// 		// Using a different context to prevent timeouts as this operation can be expensive
+	// 		// and we want to avoid affecting the critical code path.
+	// 		ctx := context.TODO()
+	// 		preState, err := s.cfg.chain.AttestationTargetState(ctx, data.Target)
+	// 		if err != nil {
+	// 			log.WithError(err).Error("Could not retrieve pre state")
+	// 			tracing.AnnotateError(span, err)
+	// 			return
+	// 		}
+	// 		committee, err := helpers.BeaconCommitteeFromState(ctx, preState, data.Slot, committeeIndex)
+	// 		if err != nil {
+	// 			log.WithError(err).Error("Could not get attestation committee")
+	// 			tracing.AnnotateError(span, err)
+	// 			return
+	// 		}
+	// 		indexedAtt, err := attestation.ConvertToIndexed(ctx, attForValidation, committee)
+	// 		if err != nil {
+	// 			log.WithError(err).Error("Could not convert to indexed attestation")
+	// 			tracing.AnnotateError(span, err)
+	// 			return
+	// 		}
+	// 		s.cfg.slasherAttestationsFeed.Send(&types.WrappedIndexedAtt{IndexedAtt: indexedAtt})
+	// 	}()
+	// }
 
-	// Notify other services in the beacon node
-	s.cfg.attestationNotifier.OperationFeed().Send(&feed.Event{
-		Type: eventType,
-		Data: eventData,
-	})
+	// // Notify other services in the beacon node
+	// s.cfg.attestationNotifier.OperationFeed().Send(&feed.Event{
+	// 	Type: eventType,
+	// 	Data: eventData,
+	// })
 
-	s.setSeenUnaggregatedAtt(attKey)
+	// s.setSeenUnaggregatedAtt(attKey)
 
-	// Attach final validated attestation to the message for further pipeline use
-	msg.ValidatorData = attForValidation
+	// // Attach final validated attestation to the message for further pipeline use
+	// msg.ValidatorData = attForValidation
 
 	return pubsub.ValidationAccept, nil
 }
