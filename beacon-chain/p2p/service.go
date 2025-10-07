@@ -35,6 +35,9 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/metric"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
 
 var _ runtime.Service = (*Service)(nil)
@@ -100,6 +103,24 @@ type custodyInfo struct {
 	groupCount            uint64
 }
 
+// createPrometheusMeterProvider creates a Prometheus exporter and returns a MeterProvider
+// configured to export pubsub metrics to Prometheus.
+func (s *Service) createPrometheusMeterProvider() (metric.MeterProvider, error) {
+	// Create Prometheus exporter
+	exporter, err := prometheus.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Prometheus exporter")
+	}
+
+	// Create MeterProvider with the Prometheus exporter
+	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(exporter),
+	)
+
+	log.Info("Created Prometheus meter provider for pubsub metrics")
+	return provider, nil
+}
+
 // NewService initializes a new p2p service compatible with shared.Service interface. No
 // connections are made until the Start function is called during the service registry startup.
 func NewService(ctx context.Context, cfg *Config) (*Service, error) {
@@ -162,6 +183,15 @@ func NewService(ctx context.Context, cfg *Config) (*Service, error) {
 	// account previously added peers when creating the gossipsub
 	// object.
 	psOpts := s.pubsubOptions()
+
+	pubSubProvider, err := s.createPrometheusMeterProvider()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create pubsub meter provider")
+	}
+
+	// TODO: Enable pubsub OpenTelemetry metrics when dependencies are resolved
+	// For now, use nil to disable OpenTelemetry metrics (existing Prometheus metrics still work)
+	psOpts = append(psOpts, pubsub.WithMeterProvider(pubSubProvider))
 
 	// Set the pubsub global parameters that we require.
 	setPubSubParameters()
