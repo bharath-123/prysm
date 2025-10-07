@@ -70,7 +70,7 @@ require (
 	github.com/spf13/afero v1.10.0
 	github.com/status-im/keycard-go v0.2.0
 	github.com/stretchr/testify v1.11.1
-	github.com/supranational/blst v0.3.14
+	github.com/supranational/blst v0.3.15
 	github.com/thomaso-mirodin/intmath v0.0.0-20160323211736-5dc6d854e46e
 	github.com/trailofbits/go-mutexasserts v0.0.0-20250212181730-4c2b8e9e784b
 	github.com/tyler-smith/go-bip39 v1.1.0
