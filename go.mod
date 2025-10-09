@@ -299,4 +299,4 @@ require (
 
 replace github.com/json-iterator/go => github.com/prestonvanloon/go v1.1.7-0.20190722034630-4f2e55fcf87b
 
-replace github.com/libp2p/go-libp2p-pubsub => github.com/bharath-123/go-libp2p-pubsub v0.0.0-20251009054734-c7c32007e7dd
+replace github.com/libp2p/go-libp2p-pubsub => github.com/bharath-123/go-libp2p-pubsub v0.0.0-20251009154457-9c875bed58aa
