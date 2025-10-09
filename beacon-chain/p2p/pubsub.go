@@ -151,6 +151,9 @@ func (s *Service) pubsubOptions() []pubsub.Option {
 		pubsub.WithRawTracer(gossipTracer{host: s.host}),
 	}
 
+	// log s.cfg.QueueSize
+	log.Infof("BHARATH: s.cfg.QueueSize: %d", s.cfg.QueueSize)
+
 	if len(s.cfg.StaticPeers) > 0 {
 		directPeersAddrInfos, err := parsePeersEnr(s.cfg.StaticPeers)
 		if err != nil {
