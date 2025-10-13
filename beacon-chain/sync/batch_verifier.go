@@ -114,7 +114,6 @@ func (s *Service) validateWithBatchVerifier(ctx context.Context, message string,
 
 func verifyBatch(verifierBatch []*signatureVerifier) {
 	verifyBatchStartTime := time.Now()
-	defer batchVerifierProcessingTime.Observe(float64(time.Since(verifyBatchStartTime).Microseconds()))
 	if len(verifierBatch) == 0 {
 		return
 	}
@@ -138,6 +137,8 @@ func verifyBatch(verifierBatch []*signatureVerifier) {
 	for i := 0; i < len(verifierBatch); i++ {
 		verifierBatch[i].resChan <- verificationErr
 	}
+
+	batchVerifierProcessingTime.Observe(float64(time.Since(verifyBatchStartTime).Microseconds()))
 }
 
 func performBatchAggregation(aggSet *bls.SignatureBatch) (*bls.SignatureBatch, error) {
