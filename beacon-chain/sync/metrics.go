@@ -337,7 +337,21 @@ var (
 		},
 	)
 
-	
+	// Dive into validateUnaggregatedAttWithState
+	timeToGenerateAttestationSignatureBatch = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_generate_attestation_signature_batch_microseconds",
+			Help:    "Captures the time taken to generate an attestation signature batch.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+	timeToValidateWithBatchVerifier = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_validate_with_batch_verifier_microseconds",
+			Help:    "Captures the time taken to validate an attestation with a batch verifier.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
 )
 
 func (s *Service) updateMetrics() {

@@ -377,14 +377,23 @@ func (s *Service) validateUnaggregatedAttWithState(ctx context.Context, a eth.At
 	ctx, span := trace.StartSpan(ctx, "sync.validateUnaggregatedAttWithState")
 	defer span.End()
 
+	attestationSignatureBatchStartTime := time.Now()
 	set, err := blocks.AttestationSignatureBatch(ctx, bs, []eth.Att{a})
 	if err != nil {
 		tracing.AnnotateError(span, err)
 		attBadSignatureBatchCount.Inc()
 		return pubsub.ValidationReject, err
 	}
+	timeToGenerateAttestationSignatureBatch.Observe(float64(time.Since(attestationSignatureBatchStartTime).Microseconds()))
 
-	return s.validateWithBatchVerifier(ctx, "attestation", set)
+	validateWithBatchVerifierStartTime := time.Now()
+	res, err := s.validateWithBatchVerifier(ctx, "attestation", set)
+	if err != nil {
+		return pubsub.ValidationReject, err
+	}
+	timeToValidateWithBatchVerifier.Observe(float64(time.Since(validateWithBatchVerifierStartTime).Microseconds()))
+
+	return res, nil
 }
 
 func validateAttestingIndex(
