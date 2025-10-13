@@ -31,7 +31,10 @@ type kzgVerifier struct {
 func (s *Service) verifierRoutine() {
 	verifierBatch := make([]*signatureVerifier, 0)
 	ticker := time.NewTicker(signatureVerificationInterval)
+
+	batchVerifierMaxSize.Set(float64(s.cfg.batchVerifierLimit))
 	for {
+		signatureBatchSizes.Observe(float64(len(verifierBatch)))
 		select {
 		case <-s.ctx.Done():
 			// Clean up currently utilised resources.
@@ -110,6 +113,8 @@ func (s *Service) validateWithBatchVerifier(ctx context.Context, message string,
 }
 
 func verifyBatch(verifierBatch []*signatureVerifier) {
+	verifyBatchStartTime := time.Now()
+	defer batchVerifierProcessingTime.Observe(float64(time.Since(verifyBatchStartTime).Microseconds()))
 	if len(verifierBatch) == 0 {
 		return
 	}

@@ -67,9 +67,6 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 	ctx, span := trace.StartSpan(ctx, "sync.validateCommitteeIndexBeaconAttestation")
 	defer span.End()
 
-	// 1. Time to decode message
-
-	decodeStartTime := time.Now()
 	if msg.Topic == nil {
 		return pubsub.ValidationReject, p2p.ErrInvalidTopic
 	}
@@ -88,9 +85,6 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 		return pubsub.ValidationReject, err
 	}
 
-	// 1. End Time to decode message
-	timeToDecodeAttestation.Observe(float64(time.Since(decodeStartTime).Microseconds()))
-
 	data := att.GetData()
 
 	// Do not process slot 0 attestations.
@@ -98,8 +92,6 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 		return pubsub.ValidationIgnore, nil
 	}
 
-	// 2. Time to validate attestation slot and epoch
-	validateStartTime := time.Now()
 	// Attestation's slot is within ATTESTATION_PROPAGATION_SLOT_RANGE and early attestation
 	// processing tolerance.
 	if err := helpers.ValidateAttestationTime(data.Slot, s.cfg.clock.GenesisTime(), earlyAttestationProcessingTolerance); err != nil {
@@ -111,10 +103,7 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 	}
 
 	// 2. End Time to validate attestation slot and epoch
-	timeToValidateAttestationSlotAndEpoch.Observe(float64(time.Since(validateStartTime).Microseconds()))
 	
-	// 3. Time to generate attestation cache key
-	generateAttestationCacheKeyStartTime := time.Now()
 	committeeIndex := att.GetCommitteeIndex()
 
 	// Generate cache key for unaggregated attestation tracking
@@ -124,11 +113,7 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 		return pubsub.ValidationIgnore, nil
 	}
 
-	// 3. End Time to generate attestation cache key
-	timeToGenerateAttestationCacheKey.Observe(float64(time.Since(generateAttestationCacheKeyStartTime).Microseconds()))
-
 	// 4. Time to verify if attestation references a bad block
-	timeToVerifyAttestationReferencesBadBlockStartTime := time.Now()
 	if !s.slasherEnabled {
 		// Verify this the first attestation received for the participating validator for the slot.
 		if s.hasSeenUnaggregatedAtt(attKey) {
@@ -141,12 +126,8 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 			attBadBlockCount.Inc()
 			return pubsub.ValidationReject, errors.New("attestation data references bad block root")
 		}
-		// 4. End Time to verify if attestation references a bad block
-		timeToVerifyAttestationReferencesBadBlock.Observe(float64(time.Since(timeToVerifyAttestationReferencesBadBlockStartTime).Microseconds()))
 	}
 
-	// 5. Time to verify if attestation is in fork choice
-	timeToVerifyAttestationInForkChoiceStartTime := time.Now()
 	// Verify the block being voted and the processed state is in beaconDB and the block has passed validation if it's in the beaconDB.
 	blockRoot := bytesutil.ToBytes32(data.BeaconBlockRoot)
 	if !s.hasBlockAndState(ctx, blockRoot) {
@@ -156,58 +137,35 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 		tracing.AnnotateError(span, blockchain.ErrNotDescendantOfFinalized)
 		return pubsub.ValidationIgnore, blockchain.ErrNotDescendantOfFinalized
 	}
-	// 5. End Time to verify if attestation is in fork choice
-	timeToVerifyAttestationInForkChoice.Observe(float64(time.Since(timeToVerifyAttestationInForkChoiceStartTime).Microseconds()))
-	// 6. Time to verify LMD GHOST and FFG consistency
-	timeToVerifyLmdFfgConsistencyStartTime := time.Now()
 	if err = s.cfg.chain.VerifyLmdFfgConsistency(ctx, att); err != nil {
 		tracing.AnnotateError(span, err)
 		attBadLmdConsistencyCount.Inc()
 		return pubsub.ValidationReject, err
 	}
-	// 6. End Time to verify LMD GHOST and FFG consistency
-	timeToVerifyLmdFfgConsistency.Observe(float64(time.Since(timeToVerifyLmdFfgConsistencyStartTime).Microseconds()))
-	// 7. Time to retrieve attestation target state
 
-	timeToRetrieveAttestationTargetStateStartTime := time.Now()
 	preState, err := s.cfg.chain.AttestationTargetState(ctx, data.Target)
 	if err != nil {
 		tracing.AnnotateError(span, err)
 		return pubsub.ValidationIgnore, err
 	}
-	// 7. End Time to retrieve attestation target state
-	timeToRetrieveAttestationTargetState.Observe(float64(time.Since(timeToRetrieveAttestationTargetStateStartTime).Microseconds()))
 
-	// 8. Time to validate unaggregated attestation topic
-	timeToValidateUnaggregatedAttTopicStartTime := time.Now()
 	validationRes, err := s.validateUnaggregatedAttTopic(ctx, att, preState, *msg.Topic)
 	if validationRes != pubsub.ValidationAccept {
 		return validationRes, err
 	}
-	// 8. End Time to validate unaggregated attestation topic
-	timeToValidateUnaggregatedAttTopic.Observe(float64(time.Since(timeToValidateUnaggregatedAttTopicStartTime).Microseconds()))
 
-	// 9. Time to get attestation committee
-	timeToGetAttestationCommitteeStartTime := time.Now()
 	committee, err := helpers.BeaconCommitteeFromState(ctx, preState, data.Slot, committeeIndex)
 	if err != nil {
 		tracing.AnnotateError(span, err)
 		return pubsub.ValidationIgnore, err
 	}
-	// 9. End Time to get attestation committee
-	timeToGetAttestationCommittee.Observe(float64(time.Since(timeToGetAttestationCommitteeStartTime).Microseconds()))
 
-	// 10. Time to validate attester data
-	timeToValidateAttesterDataStartTime := time.Now()
 	validationRes, err = validateAttesterData(ctx, att, committee)
 	if validationRes != pubsub.ValidationAccept {
 		return validationRes, err
 	}
-	// 10. End Time to validate attester data
-	timeToValidateAttesterData.Observe(float64(time.Since(timeToValidateAttesterDataStartTime).Microseconds()))
-	// 11. Time to consoliate electra attestation
+
 	// Consolidated handling of Electra SingleAttestation vs Phase0 unaggregated attestation
-	timeToConsolidateElectraAttestationStartTime := time.Now()
 	var (
 		attForValidation eth.Att // what we'll pass to further validation
 		eventType        feed.EventType
@@ -236,8 +194,6 @@ func (s *Service) validateCommitteeIndexBeaconAttestation(
 			Attestation: att,
 		}
 	}
-	// 11. End Time to consoliate electra attestation
-	timeToConsolidateElectraAttestation.Observe(float64(time.Since(timeToConsolidateElectraAttestationStartTime).Microseconds()))
 	// 12. Time to validate unaggregated attestation with state
 	timeToValidateUnaggregatedAttWithStateStartTime := time.Now()
 	validationRes, err = s.validateUnaggregatedAttWithState(ctx, attForValidation, preState)
