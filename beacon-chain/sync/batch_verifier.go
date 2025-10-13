@@ -34,7 +34,6 @@ func (s *Service) verifierRoutine() {
 
 	batchVerifierMaxSize.Set(float64(s.cfg.batchVerifierLimit))
 	for {
-		signatureBatchSizes.Observe(float64(len(verifierBatch)))
 		select {
 		case <-s.ctx.Done():
 			// Clean up currently utilised resources.
@@ -45,6 +44,7 @@ func (s *Service) verifierRoutine() {
 			return
 		case sig := <-s.signatureChan:
 			verifierBatch = append(verifierBatch, sig)
+			signatureBatchSizes.Observe(float64(len(verifierBatch)))
 			if len(verifierBatch) >= s.cfg.batchVerifierLimit {
 				verifyBatch(verifierBatch)
 				verifierBatch = []*signatureVerifier{}
