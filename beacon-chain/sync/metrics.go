@@ -15,6 +15,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+const (
+	tempMetricPrefix = "temp_attestation_performance_"
+)
+
 var (
 	topicPeerCount = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -235,6 +239,105 @@ var (
 			Buckets: []float64{100, 250, 500, 750, 1000, 1500, 2000, 4000, 8000, 12000, 16000},
 		},
 	)
+
+	// temp metrics for attestation performance analysis
+	timeToDecodeAttestation = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_decode_attestation_microseconds",
+			Help:    "Captures the time taken to decode an attestation.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToValidateAttestationSlotAndEpoch = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_validate_attestation_slot_and_epoch_microseconds",
+			Help:    "Captures the time taken to validate an attestation slot and epoch.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToGenerateAttestationCacheKey = promauto.NewHistogram(	
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_generate_attestation_cache_key_microseconds",
+			Help:    "Captures the time taken to generate an attestation cache key.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToVerifyAttestationReferencesBadBlock = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_verify_attestation_references_bad_block_microseconds",
+			Help:    "Captures the time taken to verify if an attestation references a bad block.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToVerifyAttestationInForkChoice = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_verify_attestation_in_fork_choice_microseconds",
+			Help:    "Captures the time taken to verify if an attestation is in fork choice.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToVerifyLmdFfgConsistency = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_verify_lmd_fg_consistency_microseconds",
+			Help:    "Captures the time taken to verify LMD GHOST and FFG consistency.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToRetrieveAttestationTargetState = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_retrieve_attestation_target_state_microseconds",
+			Help:    "Captures the time taken to retrieve an attestation target state.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToValidateUnaggregatedAttTopic = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_validate_unaggregated_att_topic_microseconds",
+			Help:    "Captures the time taken to validate an unaggregated attestation topic.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToGetAttestationCommittee = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_get_attestation_committee_microseconds",
+			Help:    "Captures the time taken to get an attestation committee.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToValidateAttesterData = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_validate_attester_data_microseconds",
+			Help:    "Captures the time taken to validate an attester data.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToConsolidateElectraAttestation = promauto.NewHistogram(	
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_consolidate_electra_attestation_microseconds",
+			Help:    "Captures the time taken to consolidate an electra attestation.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	timeToValidateUnaggregatedAttWithState = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    tempMetricPrefix + "time_to_validate_unaggregated_att_with_state_microseconds",
+			Help:    "Captures the time taken to validate an unaggregated attestation with state.",
+			Buckets: []float64{100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 20_000_000, 30_000_000},
+		},
+	)
+
+	
 )
 
 func (s *Service) updateMetrics() {
