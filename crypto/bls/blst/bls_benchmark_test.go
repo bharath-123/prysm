@@ -40,15 +40,41 @@ func BenchmarkSignature_AggregateVerify(b *testing.B) {
 		sigs = append(sigs, sig)
 		msgs = append(msgs, msg)
 	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	b.Run("aggregate sign", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			blst.AggregateSignatures(sigs)
+		}
+	})
+
 	aggregated := blst.AggregateSignatures(sigs)
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		if !aggregated.AggregateVerify(pks, msgs) {
-			b.Fatal("could not verify aggregate sig")
+	b.Run("aggregate verify", func(b *testing.B) {
+
+		for i := 0; i < b.N; i++ {
+			if !aggregated.AggregateVerify(pks, msgs) {
+				b.Fatal("could not verify aggregate sig")
+			}
 		}
-	}
+	})
+
+	// now verify each individually to see the performance diff
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.Run("individual verify", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for j := 0; j < sigN; j++ {
+				if !sigs[j].Verify(pks[j], msgs[j][:]) {
+					b.Fatal("could not verify sig")
+				}
+			}
+		}
+	})
 }
 
 func BenchmarkSecretKey_Marshal(b *testing.B) {
