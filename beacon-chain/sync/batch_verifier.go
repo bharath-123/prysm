@@ -46,11 +46,13 @@ func (s *Service) verifierRoutine() {
 			verifierBatch = append(verifierBatch, sig)
 			signatureBatchSizes.Observe(float64(len(verifierBatch)))
 			if len(verifierBatch) >= s.cfg.batchVerifierLimit {
+				batchVerifierTriggeredByBatchLimit.Inc()
 				verifyBatch(verifierBatch)
 				verifierBatch = []*signatureVerifier{}
 			}
 		case <-ticker.C:
 			if len(verifierBatch) > 0 {
+				batchVerifierTriggeredByTimeout.Inc()
 				verifyBatch(verifierBatch)
 				verifierBatch = []*signatureVerifier{}
 			}

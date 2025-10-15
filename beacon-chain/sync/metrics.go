@@ -285,6 +285,16 @@ var (
 		Name:    tempMetricPrefix + "batch_verifier_max_size",
 		Help:    "Captures the maximum size of a batch verifier.",
 	})
+
+	batchVerifierTriggeredByTimeout = promauto.NewCounter(prometheus.CounterOpts{
+		Name: tempMetricPrefix + "batch_verifier_triggered_by_timeout",
+		Help: "Captures the number of times a batch verifier was triggered by a timeout.",
+	})
+
+	batchVerifierTriggeredByBatchLimit = promauto.NewCounter(prometheus.CounterOpts{
+		Name: tempMetricPrefix + "batch_verifier_triggered_by_batch",
+		Help: "Captures the number of times a batch verifier was triggered by a batch.",
+	})
 )
 
 func (s *Service) updateMetrics() {
