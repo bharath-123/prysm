@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const signatureVerificationInterval = 10 * time.Millisecond
+const signatureVerificationInterval = 1000 * time.Millisecond
 
 type signatureVerifier struct {
 	set     *bls.SignatureBatch
