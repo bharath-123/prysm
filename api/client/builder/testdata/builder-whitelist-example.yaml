@@ -1,0 +1,20 @@
+# Example Builder Whitelist Configuration
+# 
+# This file configures the list of builders that the beacon node will connect to directly
+# instead of using MEV-Boost. Each builder entry has:
+#   - url: The HTTP endpoint of the builder (required)
+#   - min_bid: Minimum bid in Gwei to accept from this builder (optional, defaults to 0)
+#
+# When GetHeader is called, the beacon node will query all builders in parallel and
+# select the bid with the highest value (that meets the min_bid threshold).
+#
+# Usage:
+#   beacon-chain --builder-whitelist-file=/path/to/builder-whitelist.yaml
+
+builders:
+  - url: "https://builder1.example.com"
+    min_bid: 100000000  # 0.1 ETH in Gwei
+  - url: "https://builder2.example.com"
+    min_bid: 50000000   # 0.05 ETH in Gwei
+  - url: "https://builder3.example.com"
+    min_bid: 0          # Accept any bid

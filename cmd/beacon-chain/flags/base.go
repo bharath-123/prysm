@@ -23,9 +23,18 @@ var (
 
 var (
 	// MevRelayEndpoint provides an HTTP access endpoint to a MEV builder network.
+	// Deprecated: Use BuilderWhitelistFile for direct builder connections.
 	MevRelayEndpoint = &cli.StringFlag{
 		Name:  "http-mev-relay",
 		Usage: "A MEV builder relay string http endpoint, this will be used to interact MEV builder network using API defined in: https://ethereum.github.io/builder-specs/#/Builder",
+		Value: "",
+	}
+
+	// BuilderWhitelistFile provides a path to a YAML file containing builder configurations.
+	// This replaces MEV-Boost by allowing direct connections to multiple builders.
+	BuilderWhitelistFile = &cli.StringFlag{
+		Name:  "builder-whitelist-file",
+		Usage: "Path to a YAML file containing builder whitelist configuration. Each builder entry includes a URL and optional min_bid (in Gwei). When specified, this takes precedence over --http-mev-relay.",
 		Value: "",
 	}
 
