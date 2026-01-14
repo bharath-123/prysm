@@ -64,6 +64,9 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 	if s.cfg.builderClient != nil && !reflect.ValueOf(s.cfg.builderClient).IsNil() {
 		s.c = s.cfg.builderClient
 
+		// Wait for the Relays to come up
+		time.Sleep(3 * time.Second)
+
 		// Is the builder up?
 		if err := s.c.Status(ctx); err != nil {
 			log.WithError(err).Error("Failed to check builder status")
