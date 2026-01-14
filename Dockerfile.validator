@@ -6,6 +6,7 @@ WORKDIR /app/cmd/validator/validator.runfiles/prysm
 ADD ./_validator /app/cmd/validator/validator
 RUN ln -s /app/cmd/validator/validator /validator
 ADD ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chmod +x /app/cmd/validator/validator
 RUN apt-get update && apt-get install -y ca-certificates libc6 && update-ca-certificates
 
 ENTRYPOINT ["/entrypoint.sh"]
