@@ -21,9 +21,9 @@ import (
 // The signature is produced by the private key corresponding to Pubkey; Pubkey must be a
 // validator key managed by this validator client.
 type SignGetHeaderAuthRequest struct {
-	Slot       interface{} `json:"slot"`        // Slot as number or decimal string (e.g. 123 or "123")
-	ParentHash string      `json:"parent_hash"` // 32-byte hash as hex with 0x prefix
-	Pubkey     string      `json:"pubkey"`      // 48-byte BLS pubkey as hex; must match a local validator key (signature uses its private key)
+	Slot       any    `json:"slot"`        // Slot as number or decimal string (e.g. 123 or "123")
+	ParentHash string `json:"parent_hash"` // 32-byte hash as hex with 0x prefix
+	Pubkey     string `json:"pubkey"`      // 48-byte BLS pubkey as hex; must match a local validator key (signature uses its private key)
 }
 
 // SignGetHeaderAuthResponse is the JSON response.
@@ -136,7 +136,7 @@ func (s *Server) SignGetHeaderAuth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func parseSlotFromRequest(v interface{}) (uint64, error) {
+func parseSlotFromRequest(v any) (uint64, error) {
 	if v == nil {
 		return 0, errors.New("slot is required")
 	}
