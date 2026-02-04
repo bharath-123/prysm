@@ -9,6 +9,7 @@ go_library(
         "handlers_accounts.go",
         "handlers_auth.go",
         "handlers_beacon.go",
+        "handlers_get_header_auth.go",
         "handlers_health.go",
         "handlers_keymanager.go",
         "handlers_slashing.go",
@@ -23,6 +24,7 @@ go_library(
     ],
     deps = [
         "//api:go_default_library",
+        "//api/client/builder:go_default_library",
         "//api/grpc:go_default_library",
         "//api/pagination:go_default_library",
         "//api/rest:go_default_library",
@@ -95,6 +97,7 @@ go_test(
         "handlers_accounts_test.go",
         "handlers_auth_test.go",
         "handlers_beacon_test.go",
+        "handlers_get_header_auth_test.go",
         "handlers_health_test.go",
         "handlers_keymanager_test.go",
         "handlers_slashing_test.go",
@@ -104,6 +107,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//api:go_default_library",
+        "//api/client/builder:go_default_library",
         "//api/grpc:go_default_library",
         "//async/event:go_default_library",
         "//cmd/validator/flags:go_default_library",
