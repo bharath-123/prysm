@@ -40,6 +40,11 @@ func NewHTTPGetHeaderAuthSigner(baseURL string) GetHeaderAuthSigner {
 	url := baseURL + signGetHeaderAuthPath
 	client := &http.Client{Timeout: signerHTTPTimeout}
 	return func(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubkey [48]byte) []byte {
+		log.WithFields(map[string]any{
+			"slot":   slot,
+			"url":    url,
+			"pubkey": hexutil.Encode(pubkey[:4]),
+		}).Info("Calling validator for X-Request-Auth signature")
 		reqBody := signGetHeaderAuthRequest{
 			Slot:       uint64(slot),
 			ParentHash: hexutil.Encode(parentHash[:]),
@@ -88,6 +93,7 @@ func NewHTTPGetHeaderAuthSigner(baseURL string) GetHeaderAuthSigner {
 			log.WithField("len", len(sigBytes)).Warn("Get-header auth signer returned invalid signature length")
 			return nil
 		}
+		log.WithField("slot", slot).Info("Received X-Request-Auth signature from validator")
 		return sigBytes
 	}
 }

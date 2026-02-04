@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -89,6 +90,11 @@ func (s *Server) SignGetHeaderAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.WithFields(map[string]any{
+		"slot":   slot,
+		"pubkey": fmt.Sprintf("%#x", pubkey[:4]),
+	}).Info("SignGetHeaderAuth: signing X-Request-Auth for GetHeader")
+
 	data := &builder.GetHeaderAuthData{
 		Slot:       primitives.Slot(slot),
 		ParentHash: parentHash,
@@ -122,6 +128,7 @@ func (s *Server) SignGetHeaderAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.WithField("slot", slot).Info("SignGetHeaderAuth: returning X-Request-Auth signature to beacon node")
 	httputil.WriteJson(w, &SignGetHeaderAuthResponse{
 		Data: &SignGetHeaderAuthData{
 			Signature: hexutil.Encode(sigBytes),

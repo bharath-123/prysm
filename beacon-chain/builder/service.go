@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -138,7 +139,17 @@ func (s *Service) GetHeader(ctx context.Context, slot primitives.Slot, parentHas
 
 	var authSig []byte
 	if s.cfg.getHeaderAuthSigner != nil {
+		log.WithFields(map[string]any{
+			"slot":       slot,
+			"parentHash": fmt.Sprintf("%#x", parentHash[:4]),
+			"pubkey":     fmt.Sprintf("%#x", pubKey[:4]),
+		}).Info("Requesting X-Request-Auth signature from validator for GetHeader")
 		authSig = s.cfg.getHeaderAuthSigner(ctx, slot, parentHash, pubKey)
+		if len(authSig) > 0 {
+			log.WithField("slot", slot).Info("Got X-Request-Auth signature for GetHeader, sending to builder")
+		} else {
+			log.WithField("slot", slot).Warn("GetHeader auth signer returned no signature, requesting header without X-Request-Auth")
+		}
 	}
 	h, err := s.c.GetHeader(ctx, slot, parentHash, pubKey, authSig)
 	tracing.AnnotateError(span, err)
