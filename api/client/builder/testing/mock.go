@@ -27,7 +27,7 @@ func (MockClient) NodeURL() string {
 }
 
 // GetHeader --
-func (MockClient) GetHeader(_ context.Context, _ primitives.Slot, _ [32]byte, _ [48]byte) (builder.SignedBid, error) {
+func (MockClient) GetHeader(_ context.Context, _ primitives.Slot, _ [32]byte, _ [48]byte, _ []byte) (builder.SignedBid, error) {
 	return nil, nil
 }
 

@@ -32,11 +32,16 @@ type BlockBuilder interface {
 	Configured() bool
 }
 
+// GetHeaderAuthSigner returns the BLS signature for X-Request-Auth (slot, parentHash, pubkey).
+// When nil, GetHeader is called without the X-Request-Auth header.
+type GetHeaderAuthSigner func(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubkey [48]byte) []byte
+
 // config defines a config struct for dependencies into the service.
 type config struct {
-	builderClient builder.BuilderClient
-	beaconDB      db.HeadAccessDatabase
-	headFetcher   blockchain.HeadFetcher
+	builderClient       builder.BuilderClient
+	beaconDB            db.HeadAccessDatabase
+	headFetcher         blockchain.HeadFetcher
+	getHeaderAuthSigner GetHeaderAuthSigner
 }
 
 // Service defines a service that provides a client for interacting with the beacon chain and MEV relay network.
@@ -131,7 +136,11 @@ func (s *Service) GetHeader(ctx context.Context, slot primitives.Slot, parentHas
 		return nil, ErrNoBuilder
 	}
 
-	h, err := s.c.GetHeader(ctx, slot, parentHash, pubKey)
+	var authSig []byte
+	if s.cfg.getHeaderAuthSigner != nil {
+		authSig = s.cfg.getHeaderAuthSigner(ctx, slot, parentHash, pubKey)
+	}
+	h, err := s.c.GetHeader(ctx, slot, parentHash, pubKey, authSig)
 	tracing.AnnotateError(span, err)
 	return h, err
 }
