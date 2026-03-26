@@ -4,10 +4,8 @@ RUN apk add --no-cache git gcc musl-dev linux-headers
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
-
 COPY . .
+RUN go mod download
 
 # Build beacon-chain and validator binaries
 RUN go build -o /out/beacon-chain ./cmd/beacon-chain
