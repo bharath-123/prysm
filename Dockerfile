@@ -19,8 +19,8 @@ FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates tini
 
-COPY --from=builder /out/beacon-chain /usr/local/bin/beacon-chain
-COPY --from=builder /out/validator /usr/local/bin/validator
+COPY --from=builder /out/beacon-chain /beacon-chain
+COPY --from=builder /out/validator /validator
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["beacon-chain"]
+CMD ["/beacon-chain"]
