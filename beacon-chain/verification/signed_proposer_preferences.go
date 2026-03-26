@@ -10,6 +10,7 @@ import (
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // SignedProposerPreferencesGossipRequirements is the requirement list for gossip
@@ -59,6 +60,26 @@ func (v *ProposerPreferencesVerifier) VerifyValidProposalSlot(st state.ReadOnlyB
 		return errors.Wrap(err, "failed to get proposer lookahead")
 	}
 
+	latestBlockHash, _ := st.LatestBlockHash()
+	parentFull, _ := st.IsParentBlockFull()
+	header, _ := st.LatestExecutionPayloadHeader()
+	var headerBlockHash []byte
+	if header != nil {
+		headerBlockHash = header.BlockHash()
+	}
+	log.WithFields(logrus.Fields{
+		"stateSlot":        st.Slot(),
+		"stateEpoch":       slots.ToEpoch(st.Slot()),
+		"proposalSlot":     msg.ProposalSlot,
+		"proposalEpoch":    slots.ToEpoch(msg.ProposalSlot),
+		"validatorIndex":   msg.ValidatorIndex,
+		"latestBlockHash":  fmt.Sprintf("%#x", latestBlockHash),
+		"parentBlockFull":  parentFull,
+		"payloadBlockHash": fmt.Sprintf("%#x", headerBlockHash),
+		"lookahead":        lookahead,
+	}).Debug("VerifyValidProposalSlot state debug")
+
+	// 32 + (proposalSlot % 32)
 	slotIndex := params.BeaconConfig().SlotsPerEpoch + (msg.ProposalSlot % params.BeaconConfig().SlotsPerEpoch)
 	if uint64(len(lookahead)) <= uint64(slotIndex) {
 		return fmt.Errorf("%w: proposer lookahead index %d out of bounds", ErrProposerPreferencesInvalidProposalSlot, slotIndex)
