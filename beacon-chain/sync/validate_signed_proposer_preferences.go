@@ -47,7 +47,7 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 
 	v := s.newSignedProposerPreferencesVerifier(signedPreferences, verification.SignedProposerPreferencesGossipRequirements)
 	// [IGNORE] preferences.proposal_slot is in the next epoch.
-	if err := v.VerifyNextEpoch(st); err != nil {
+	if err := v.VerifyNextEpoch(s.cfg.clock.CurrentSlot()); err != nil {
 		return pubsub.ValidationIgnore, err
 	}
 	// [REJECT] preferences.validator_index is present at the correct slot in the

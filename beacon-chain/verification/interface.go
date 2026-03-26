@@ -7,6 +7,7 @@ import (
 	fieldparams "github.com/OffchainLabs/prysm/v7/config/fieldparams"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
+	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	payloadattestation "github.com/OffchainLabs/prysm/v7/consensus-types/payload-attestation"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 )
@@ -85,7 +86,7 @@ type NewPayloadAttestationMsgVerifier func(pa payloadattestation.ROMessage, reqs
 
 // SignedProposerPreferencesVerifier defines the methods implemented by the signed proposer preferences verifier.
 type SignedProposerPreferencesVerifier interface {
-	VerifyNextEpoch(state.ReadOnlyBeaconState) error
+	VerifyNextEpoch(primitives.Slot) error
 	VerifyValidProposalSlot(state.ReadOnlyBeaconState) error
 	VerifySignature(state.ReadOnlyBeaconState) error
 	SatisfyRequirement(Requirement)

@@ -19,11 +19,11 @@ func TestProposerPreferencesVerifier_VerifyNextEpoch(t *testing.T) {
 	st, _, signed := newSignedProposerPreferencesState(t, 31, 40, 0)
 
 	verifier := &ProposerPreferencesVerifier{results: newResults(RequireProposerPreferencesNextEpoch), p: signed}
-	require.NoError(t, verifier.VerifyNextEpoch(st))
+	require.NoError(t, verifier.VerifyNextEpoch(st.Slot()))
 
 	signed.Message.ProposalSlot = st.Slot()
 	verifier = &ProposerPreferencesVerifier{results: newResults(RequireProposerPreferencesNextEpoch), p: signed}
-	require.ErrorIs(t, verifier.VerifyNextEpoch(st), ErrProposerPreferencesNotNextEpoch)
+	require.ErrorIs(t, verifier.VerifyNextEpoch(st.Slot()), ErrProposerPreferencesNotNextEpoch)
 }
 
 func TestProposerPreferencesVerifier_VerifyValidProposalSlot(t *testing.T) {

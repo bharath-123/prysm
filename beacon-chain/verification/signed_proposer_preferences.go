@@ -6,6 +6,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/signing"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/config/params"
+	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
@@ -33,12 +34,15 @@ type ProposerPreferencesVerifier struct {
 	p       *ethpb.SignedProposerPreferences
 }
 
-// VerifyNextEpoch verifies the proposal slot is in the next epoch.
-func (v *ProposerPreferencesVerifier) VerifyNextEpoch(st state.ReadOnlyBeaconState) (err error) {
+// VerifyNextEpoch verifies the proposal slot is in the next epoch relative to
+// currentSlot. Callers should pass the wall-clock slot (not the head state
+// slot) so that the check remains accurate even when the head lags behind due
+// to missed blocks.
+func (v *ProposerPreferencesVerifier) VerifyNextEpoch(currentSlot primitives.Slot) (err error) {
 	defer v.record(RequireProposerPreferencesNextEpoch, &err)
 
 	msg := v.message()
-	currentEpoch := slots.ToEpoch(st.Slot())
+	currentEpoch := slots.ToEpoch(currentSlot)
 	if slots.ToEpoch(msg.ProposalSlot) != currentEpoch+1 {
 		return fmt.Errorf("%w: got %d want %d", ErrProposerPreferencesNotNextEpoch, slots.ToEpoch(msg.ProposalSlot), currentEpoch+1)
 	}

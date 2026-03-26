@@ -141,7 +141,7 @@ type mockSignedProposerPreferencesVerifier struct {
 
 var _ verification.SignedProposerPreferencesVerifier = &mockSignedProposerPreferencesVerifier{}
 
-func (m *mockSignedProposerPreferencesVerifier) VerifyNextEpoch(state.ReadOnlyBeaconState) error {
+func (m *mockSignedProposerPreferencesVerifier) VerifyNextEpoch(primitives.Slot) error {
 	return m.errNextEpoch
 }
 
