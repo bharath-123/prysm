@@ -39,9 +39,9 @@ func (v *ProposerPreferencesVerifier) VerifyNextEpoch(st state.ReadOnlyBeaconSta
 	defer v.record(RequireProposerPreferencesNextEpoch, &err)
 
 	msg := v.message()
-	currentEpoch := slots.ToEpoch(st.Slot())
-	proposalEpoch := slots.ToEpoch(msg.ProposalSlot)
 	clockSlot := v.clock.CurrentSlot()
+	currentEpoch := slots.ToEpoch(clockSlot)
+	proposalEpoch := slots.ToEpoch(msg.ProposalSlot)
 
 	log.WithFields(logrus.Fields{
 		"stateSlot":      st.Slot(),
