@@ -2,13 +2,16 @@ package sync
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/verification"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
+	"github.com/OffchainLabs/prysm/v7/time/slots"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -70,6 +73,13 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 
 	s.proposerPreferencesCache.Add(slot, signedPreferences.Message.FeeRecipient, signedPreferences.Message.GasLimit)
 	msg.ValidatorData = signedPreferences
+	log.WithFields(logrus.Fields{
+		"proposalSlot":   slot,
+		"proposalEpoch":  slots.ToEpoch(slot),
+		"validatorIndex": signedPreferences.Message.ValidatorIndex,
+		"feeRecipient":   fmt.Sprintf("%#x", signedPreferences.Message.FeeRecipient),
+		"gasLimit":       signedPreferences.Message.GasLimit,
+	}).Debug("Validated and accepted signed proposer preferences")
 	return pubsub.ValidationAccept, nil
 }
 
