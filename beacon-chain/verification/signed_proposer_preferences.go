@@ -9,6 +9,7 @@ import (
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // SignedProposerPreferencesGossipRequirements is the requirement list for gossip
@@ -39,8 +40,22 @@ func (v *ProposerPreferencesVerifier) VerifyNextEpoch(st state.ReadOnlyBeaconSta
 
 	msg := v.message()
 	currentEpoch := slots.ToEpoch(st.Slot())
-	if slots.ToEpoch(msg.ProposalSlot) != currentEpoch+1 {
-		return fmt.Errorf("%w: got %d want %d", ErrProposerPreferencesNotNextEpoch, slots.ToEpoch(msg.ProposalSlot), currentEpoch+1)
+	proposalEpoch := slots.ToEpoch(msg.ProposalSlot)
+	clockSlot := v.clock.CurrentSlot()
+
+	log.WithFields(logrus.Fields{
+		"stateSlot":      st.Slot(),
+		"stateEpoch":     currentEpoch,
+		"clockSlot":      clockSlot,
+		"clockEpoch":     slots.ToEpoch(clockSlot),
+		"proposalSlot":   msg.ProposalSlot,
+		"proposalEpoch":  proposalEpoch,
+		"validatorIndex": msg.ValidatorIndex,
+		"expectedEpoch":  currentEpoch + 1,
+	}).Debug("VerifyNextEpoch state debug")
+
+	if proposalEpoch != currentEpoch+1 {
+		return fmt.Errorf("%w: got %d want %d", ErrProposerPreferencesNotNextEpoch, proposalEpoch, currentEpoch+1)
 	}
 	return nil
 }

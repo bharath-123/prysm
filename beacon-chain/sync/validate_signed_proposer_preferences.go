@@ -50,6 +50,13 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 
 	v := s.newSignedProposerPreferencesVerifier(signedPreferences, verification.SignedProposerPreferencesGossipRequirements)
 	// [IGNORE] preferences.proposal_slot is in the next epoch.
+	log.WithFields(logrus.Fields{
+		"proposalSlot":   signedPreferences.Message.ProposalSlot,
+		"proposalEpoch":  slots.ToEpoch(signedPreferences.Message.ProposalSlot),
+		"validatorIndex": signedPreferences.Message.ValidatorIndex,
+		"feeRecipient":   fmt.Sprintf("%#x", signedPreferences.Message.FeeRecipient),
+		"gasLimit":       signedPreferences.Message.GasLimit,
+	}).Debug("VerifyNextEpoch state debug")
 	if err := v.VerifyNextEpoch(st); err != nil {
 		return pubsub.ValidationIgnore, err
 	}
