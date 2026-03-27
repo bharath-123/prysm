@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/transition"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/verification"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
@@ -43,23 +44,37 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 		return pubsub.ValidationReject, errNilMessage
 	}
 
-	st, err := s.cfg.chain.HeadStateReadOnly(ctx)
+	v := s.newSignedProposerPreferencesVerifier(signedPreferences, verification.SignedProposerPreferencesGossipRequirements)
+	// [IGNORE] preferences.proposal_slot is in the next epoch.
+	// Uses head state for the epoch check only.
+	headStateRO, err := s.cfg.chain.HeadStateReadOnly(ctx)
+	if err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+	if err := v.VerifyNextEpoch(headStateRO); err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+
+	// Advance the state to the first slot of the proposal epoch so that
+	// the proposer lookahead is up to date. The head state may be in the
+	// previous epoch and its lookahead has not yet been rotated.
+	proposalEpochStart, err := slots.EpochStart(slots.ToEpoch(signedPreferences.Message.ProposalSlot))
+	if err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+	headRoot, err := s.cfg.chain.HeadRoot(ctx)
+	if err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+	headState, err := s.cfg.chain.HeadState(ctx)
+	if err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+	st, err := transition.ProcessSlotsUsingNextSlotCache(ctx, headState, headRoot, proposalEpochStart)
 	if err != nil {
 		return pubsub.ValidationIgnore, err
 	}
 
-	v := s.newSignedProposerPreferencesVerifier(signedPreferences, verification.SignedProposerPreferencesGossipRequirements)
-	// [IGNORE] preferences.proposal_slot is in the next epoch.
-	log.WithFields(logrus.Fields{
-		"proposalSlot":   signedPreferences.Message.ProposalSlot,
-		"proposalEpoch":  slots.ToEpoch(signedPreferences.Message.ProposalSlot),
-		"validatorIndex": signedPreferences.Message.ValidatorIndex,
-		"feeRecipient":   fmt.Sprintf("%#x", signedPreferences.Message.FeeRecipient),
-		"gasLimit":       signedPreferences.Message.GasLimit,
-	}).Debug("VerifyNextEpoch state debug")
-	if err := v.VerifyNextEpoch(st); err != nil {
-		return pubsub.ValidationIgnore, err
-	}
 	// [REJECT] preferences.validator_index is present at the correct slot in the
 	// next epoch's portion of state.proposer_lookahead.
 	if err := v.VerifyValidProposalSlot(st); err != nil {

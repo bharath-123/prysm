@@ -43,17 +43,6 @@ func (v *ProposerPreferencesVerifier) VerifyNextEpoch(st state.ReadOnlyBeaconSta
 	currentEpoch := slots.ToEpoch(clockSlot)
 	proposalEpoch := slots.ToEpoch(msg.ProposalSlot)
 
-	log.WithFields(logrus.Fields{
-		"stateSlot":      st.Slot(),
-		"stateEpoch":     currentEpoch,
-		"clockSlot":      clockSlot,
-		"clockEpoch":     slots.ToEpoch(clockSlot),
-		"proposalSlot":   msg.ProposalSlot,
-		"proposalEpoch":  proposalEpoch,
-		"validatorIndex": msg.ValidatorIndex,
-		"expectedEpoch":  currentEpoch + 1,
-	}).Debug("VerifyNextEpoch state debug")
-
 	if proposalEpoch != currentEpoch+1 {
 		return fmt.Errorf("%w: got %d want %d", ErrProposerPreferencesNotNextEpoch, proposalEpoch, currentEpoch+1)
 	}
@@ -70,7 +59,23 @@ func (v *ProposerPreferencesVerifier) VerifyValidProposalSlot(st state.ReadOnlyB
 		return errors.Wrap(err, "failed to get proposer lookahead")
 	}
 
-	slotIndex := params.BeaconConfig().SlotsPerEpoch + (msg.ProposalSlot % params.BeaconConfig().SlotsPerEpoch)
+	spe := params.BeaconConfig().SlotsPerEpoch
+	slotIndex := spe + (msg.ProposalSlot % spe)
+	clockSlot := v.clock.CurrentSlot()
+
+
+	log.WithFields(logrus.Fields{
+		"stateSlot":      st.Slot(),
+		"stateEpoch":     slots.ToEpoch(st.Slot()),
+		"clockSlot":      clockSlot,
+		"clockEpoch":     slots.ToEpoch(clockSlot),
+		"proposalSlot":   msg.ProposalSlot,
+		"proposalEpoch":  slots.ToEpoch(msg.ProposalSlot),
+		"validatorIndex": msg.ValidatorIndex,
+		"slotIndex":      slotIndex,
+		"lookahead":      lookahead,
+	}).Debug("VerifyValidProposalSlot state debug")
+
 	if uint64(len(lookahead)) <= uint64(slotIndex) {
 		return fmt.Errorf("%w: proposer lookahead index %d out of bounds", ErrProposerPreferencesInvalidProposalSlot, slotIndex)
 	}
