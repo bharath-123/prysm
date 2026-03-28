@@ -75,7 +75,7 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 		if err != nil {
 			return pubsub.ValidationIgnore, err
 		}
-		st, err = transition.ProcessSlotsUsingNextSlotCache(ctx, headState, headRoot, proposalEpochStart)
+		st, err = transition.ProcessSlotsUsingNextSlotCache(ctx, headState, headRoot, proposalEpochStart - 1)
 		if err != nil {
 			return pubsub.ValidationIgnore, err
 		}
