@@ -6,7 +6,9 @@ import (
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/transition"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/verification"
+	"github.com/OffchainLabs/prysm/v7/config/params"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
@@ -55,24 +57,30 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 		return pubsub.ValidationIgnore, err
 	}
 
-	// Advance the state to the first slot of the proposal epoch so that
-	// the proposer lookahead is up to date. The head state may be in the
-	// previous epoch and its lookahead has not yet been rotated.
-	proposalEpochStart, err := slots.EpochStart(slots.ToEpoch(signedPreferences.Message.ProposalSlot))
-	if err != nil {
-		return pubsub.ValidationIgnore, err
-	}
-	headRoot, err := s.cfg.chain.HeadRoot(ctx)
-	if err != nil {
-		return pubsub.ValidationIgnore, err
-	}
-	headState, err := s.cfg.chain.HeadState(ctx)
-	if err != nil {
-		return pubsub.ValidationIgnore, err
-	}
-	st, err := transition.ProcessSlotsUsingNextSlotCache(ctx, headState, headRoot, proposalEpochStart)
-	if err != nil {
-		return pubsub.ValidationIgnore, err
+	// In Gloas, the proposer lookahead is rotated at epoch boundaries.
+	// The head state may be in the previous epoch, so we advance it to the
+	// first slot of the proposal epoch to ensure the lookahead is current.
+	// Pre-Gloas, the head state is sufficient as-is.
+	var st state.ReadOnlyBeaconState
+	if slots.ToEpoch(s.cfg.clock.CurrentSlot()) >= params.BeaconConfig().GloasForkEpoch {
+		proposalEpochStart, err := slots.EpochStart(slots.ToEpoch(signedPreferences.Message.ProposalSlot))
+		if err != nil {
+			return pubsub.ValidationIgnore, err
+		}
+		headRoot, err := s.cfg.chain.HeadRoot(ctx)
+		if err != nil {
+			return pubsub.ValidationIgnore, err
+		}
+		headState, err := s.cfg.chain.HeadState(ctx)
+		if err != nil {
+			return pubsub.ValidationIgnore, err
+		}
+		st, err = transition.ProcessSlotsUsingNextSlotCache(ctx, headState, headRoot, proposalEpochStart)
+		if err != nil {
+			return pubsub.ValidationIgnore, err
+		}
+	} else {
+		st = headStateRO
 	}
 
 	// [REJECT] preferences.validator_index is present at the correct slot in the
