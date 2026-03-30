@@ -84,6 +84,7 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 
 	s.proposerPreferencesCache.Add(slot, signedPreferences.Message.FeeRecipient, signedPreferences.Message.GasLimit)
 	msg.ValidatorData = signedPreferences
+	log.WithField("slot", slot).WithField("validatorIndex", signedPreferences.Message.ValidatorIndex).Debug("Proposer preferences passed gossip validation")
 	return pubsub.ValidationAccept, nil
 }
 
