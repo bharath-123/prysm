@@ -122,7 +122,7 @@ func (s *Service) proposerPreferencesState(ctx context.Context, headStateRO stat
 	return transition.ProcessSlotsUsingNextSlotCache(ctx, headState, headRoot, targetSlot)
 }
 
-func (s *Service) signedProposerPreferencesSubscriber(_ context.Context, msg proto.Message) error {
+func (s *Service) signedProposerPreferencesSubscriber(_ context.Context, msg any) error {
 	signedPreferences, ok := msg.(*ethpb.SignedProposerPreferences)
 	if !ok {
 		return errWrongMessage
