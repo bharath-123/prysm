@@ -11,6 +11,7 @@ import (
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, pid peer.ID, msg *pubsub.Message) (pubsub.ValidationResult, error) {
@@ -71,6 +72,12 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 
 	s.proposerPreferencesCache.Add(slot, signedPreferences.Message.FeeRecipient, signedPreferences.Message.GasLimit)
 	msg.ValidatorData = signedPreferences
+
+	log.WithFields(logrus.Fields{
+		"validatorIndex": signedPreferences.Message.ValidatorIndex,
+		"proposalSlot":   signedPreferences.Message.ProposalSlot,
+	}).Debug("Signed proposer preferences passed gossip validation")
+
 	return pubsub.ValidationAccept, nil
 }
 
