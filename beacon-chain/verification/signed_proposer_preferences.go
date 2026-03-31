@@ -71,7 +71,11 @@ func (v *ProposerPreferencesVerifier) VerifySignature(st state.ReadOnlyBeaconSta
 
 	msg := v.message()
 	epoch := slots.ToEpoch(msg.ProposalSlot)
-	domain, err := signing.Domain(st.Fork(), epoch, params.BeaconConfig().DomainProposerPreferences, st.GenesisValidatorsRoot())
+	fork, err := params.Fork(epoch)
+	if err != nil {
+		return errors.Wrap(err, "fork")
+	}
+	domain, err := signing.Domain(fork, epoch, params.BeaconConfig().DomainProposerPreferences, st.GenesisValidatorsRoot())
 	if err != nil {
 		return errors.Wrap(err, "domain")
 	}
