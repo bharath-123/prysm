@@ -3,6 +3,8 @@ package sync
 import (
 	"context"
 
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed"
+	opfeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/operation"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/verification"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
@@ -45,15 +47,15 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 	}
 
 	v := s.newSignedProposerPreferencesVerifier(signedPreferences, verification.SignedProposerPreferencesGossipRequirements)
-	// [IGNORE] preferences.proposal_slot is in the next epoch.
-	if err := v.VerifyNextEpoch(st); err != nil {
-		return pubsub.ValidationIgnore, err
-	}
-	// [REJECT] preferences.validator_index is present at the correct slot in the
-	// next epoch's portion of state.proposer_lookahead.
-	if err := v.VerifyValidProposalSlot(st); err != nil {
-		return pubsub.ValidationReject, err
-	}
+	// // [IGNORE] preferences.proposal_slot is in the next epoch.
+	// if err := v.VerifyNextEpoch(st); err != nil {
+	// 	return pubsub.ValidationIgnore, err
+	// }
+	// // [REJECT] preferences.validator_index is present at the correct slot in the
+	// // next epoch's portion of state.proposer_lookahead.
+	// if err := v.VerifyValidProposalSlot(st); err != nil {
+	// 	return pubsub.ValidationReject, err
+	// }
 
 	slot := signedPreferences.Message.ProposalSlot
 	// [IGNORE] This is the first valid signed proposer preferences message
@@ -73,9 +75,15 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 }
 
 func (s *Service) signedProposerPreferencesSubscriber(_ context.Context, msg any) error {
-	_, ok := msg.(*ethpb.SignedProposerPreferences)
+	signedPreferences, ok := msg.(*ethpb.SignedProposerPreferences)
 	if !ok {
 		return errWrongMessage
 	}
+	s.cfg.operationNotifier.OperationFeed().Send(&feed.Event{
+		Type: opfeed.ProposerPreferencesReceived,
+		Data: &opfeed.ProposerPreferencesReceivedData{
+			SignedPreferences: signedPreferences,
+		},
+	})
 	return nil
 }

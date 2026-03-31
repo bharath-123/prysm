@@ -38,6 +38,18 @@ func ROExecutionPayloadBidFromConsensus(b interfaces.ROExecutionPayloadBid) *Exe
 	}
 }
 
+func SignedProposerPreferencesFromConsensus(p *ethpb.SignedProposerPreferences) *SignedProposerPreferences {
+	return &SignedProposerPreferences{
+		Message: &ProposerPreferences{
+			ProposalSlot:   fmt.Sprintf("%d", p.Message.ProposalSlot),
+			ValidatorIndex: fmt.Sprintf("%d", p.Message.ValidatorIndex),
+			FeeRecipient:   hexutil.Encode(p.Message.FeeRecipient),
+			GasLimit:       fmt.Sprintf("%d", p.Message.GasLimit),
+		},
+		Signature: hexutil.Encode(p.Signature),
+	}
+}
+
 func BuildersFromConsensus(builders []*ethpb.Builder) []*Builder {
 	newBuilders := make([]*Builder, len(builders))
 	for i, b := range builders {
