@@ -1,6 +1,7 @@
 package beacon
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/OffchainLabs/prysm/v7/api"
@@ -9,9 +10,67 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/rpc/eth/shared"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	"github.com/OffchainLabs/prysm/v7/network/httputil"
+	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
+	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
 )
+
+// PublishExecutionPayloadBid broadcasts a signed execution payload bid to the network.
+//
+// POST /eth/v1/beacon/execution_payload/bid
+func (s *Server) PublishExecutionPayloadBid(w http.ResponseWriter, r *http.Request) {
+	ctx, span := trace.StartSpan(r.Context(), "beacon.PublishExecutionPayloadBid")
+	defer span.End()
+
+	if s.SyncChecker.Syncing() {
+		httputil.HandleError(w, "Beacon node is syncing", http.StatusServiceUnavailable)
+		return
+	}
+
+	versionHeader := r.Header.Get(api.VersionHeader)
+	if versionHeader != version.String(version.Gloas) {
+		httputil.HandleError(w, "Eth-Consensus-Version header must be \"gloas\"", http.StatusBadRequest)
+		return
+	}
+
+	var signedBid *eth.SignedExecutionPayloadBid
+	if httputil.IsRequestSsz(r) {
+		body, err := readRequestBody(r)
+		if err != nil {
+			httputil.HandleError(w, "Could not read request body: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pb := &eth.SignedExecutionPayloadBid{}
+		if err := pb.UnmarshalSSZ(body); err != nil {
+			httputil.HandleError(w, "Could not decode SSZ request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		signedBid = pb
+	} else {
+		var req structs.SignedExecutionPayloadBid
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httputil.HandleError(w, "Could not decode request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		pb, err := req.ToConsensus()
+		if err != nil {
+			httputil.HandleError(w, "Could not convert request to consensus type: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		signedBid = pb
+	}
+
+	if signedBid.Message == nil {
+		httputil.HandleError(w, "signed execution payload bid message is nil", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.Broadcaster.BroadcastForEpoch(ctx, signedBid, slots.ToEpoch(signedBid.Message.Slot)); err != nil {
+		httputil.HandleError(w, "Could not broadcast signed execution payload bid: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
 
 // GetExecutionPayloadEnvelope retrieves a full execution payload envelope by beacon block root.
 // The blinded envelope is fetched from the DB and the full execution payload is reconstructed
