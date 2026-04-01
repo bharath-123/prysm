@@ -16,7 +16,6 @@ import (
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // LatestBlockHash returns the hash of the latest execution block.

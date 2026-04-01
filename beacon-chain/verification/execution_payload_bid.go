@@ -8,7 +8,6 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // ExecutionPayloadBidGossipRequirements defines the list of requirements for gossip execution payload bids.
