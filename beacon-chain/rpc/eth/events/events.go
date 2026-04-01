@@ -807,12 +807,12 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 	}
 
 	if ev.HeadBlock.Version() >= version.Gloas {
-		header, err := rost.LatestExecutionPayloadHeader()
+		bh, err := rost.LatestBlockHash()
 		if err != nil {
-			return ev, errors.Wrap(err, "could not get latest execution payload header from state")
+			return ev, errors.Wrap(err, "could not get latest block hash from state")
 		}
-		ev.ParentBlockHash = header.BlockHash()
-		ev.ParentBlockNumber = header.BlockNumber()
+		ev.ParentBlockHash = bh[:]
+		ev.ParentBlockNumber = 0
 	} else {
 		payload, err := ev.HeadBlock.Block().Body().Execution()
 		if err != nil {
