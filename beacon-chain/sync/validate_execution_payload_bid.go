@@ -94,28 +94,28 @@ func (s *Service) validateExecutionPayloadBidGossip(ctx context.Context, pid pee
 	// [REJECT] bid.builder_index is a valid/active builder index.
 	if err := v.VerifyBuilderActive(st); err != nil {
 		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyBuilderActive")
-		return pubsub.ValidationReject, err
+		return pubsub.ValidationIgnore, err
 	}
 	// [REJECT] bid.execution_payment is zero.
 	if err := v.VerifyExecutionPaymentZero(); err != nil {
 		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyExecutionPaymentZero")
-		return pubsub.ValidationReject, err
+		return pubsub.ValidationIgnore, err
 	}
 	// [REJECT] bid.fee_recipient matches the fee_recipient from the proposer's SignedProposerPreferences associated with bid.slot.
 	if err := v.VerifyFeeRecipientMatches(pref.FeeRecipient); err != nil {
 		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyFeeRecipientMatches")
-		return pubsub.ValidationReject, err
+		return pubsub.ValidationIgnore, err
 	}
 	// [REJECT] bid.gas_limit matches the gas_limit from the proposer's SignedProposerPreferences associated with bid.slot.
 	if err := v.VerifyGasLimitMatches(pref.GasLimit); err != nil {
 		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyGasLimitMatches")
-		return pubsub.ValidationReject, err
+		return pubsub.ValidationIgnore, err
 	}
 	// The spec lists signature validation later, but the "first signed bid seen
 	// with a valid signature" gate below depends on knowing validity first.
 	if err := v.VerifySignature(st); err != nil {
 		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifySignature")
-		return pubsub.ValidationReject, err
+		return pubsub.ValidationIgnore, err
 	}
 
 	// [IGNORE] this is the first signed bid seen with a valid signature from the given builder for this slot.
