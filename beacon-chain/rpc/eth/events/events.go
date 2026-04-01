@@ -806,12 +806,21 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 		return ev, errors.Wrap(err, "could not get head state randado")
 	}
 
-	payload, err := ev.HeadBlock.Block().Body().Execution()
-	if err != nil {
-		return ev, errors.Wrap(err, "could not get execution payload for head block")
+	if ev.HeadBlock.Version() >= version.Gloas {
+		header, err := rost.LatestExecutionPayloadHeader()
+		if err != nil {
+			return ev, errors.Wrap(err, "could not get latest execution payload header from state")
+		}
+		ev.ParentBlockHash = header.BlockHash()
+		ev.ParentBlockNumber = header.BlockNumber()
+	} else {
+		payload, err := ev.HeadBlock.Block().Body().Execution()
+		if err != nil {
+			return ev, errors.Wrap(err, "could not get execution payload for head block")
+		}
+		ev.ParentBlockHash = payload.BlockHash()
+		ev.ParentBlockNumber = payload.BlockNumber()
 	}
-	ev.ParentBlockHash = payload.BlockHash()
-	ev.ParentBlockNumber = payload.BlockNumber()
 
 	t, err := slots.StartTime(rost.GenesisTime(), ev.ProposalSlot)
 	if err != nil {
