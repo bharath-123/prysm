@@ -2,6 +2,7 @@ package validator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/OffchainLabs/prysm/v7/config/params"
 	consensusblocks "github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
@@ -65,14 +66,26 @@ func (vs *Server) winningP2PBid(
 	selfBuildOnly bool,
 ) *ethpb.SignedExecutionPayloadBid {
 	if selfBuildOnly || vs.HighestBidCache == nil {
+		log.WithFields(logrus.Fields{
+			"slot":          sBlk.Block().Slot(),
+			"selfBuildOnly": selfBuildOnly,
+			"cacheNil":      vs.HighestBidCache == nil,
+		}).Debug("Skipping P2P bid lookup")
 		return nil
 	}
 
 	ed := local.ExecutionData
 	var parentHash [32]byte
 	copy(parentHash[:], ed.ParentHash())
+	parentRoot := sBlk.Block().ParentRoot()
+	log.WithFields(logrus.Fields{
+		"slot":            sBlk.Block().Slot(),
+		"parentBlockHash": fmt.Sprintf("%#x", parentHash[:]),
+		"parentBlockRoot": fmt.Sprintf("%#x", parentRoot[:]),
+	}).Debug("Looking up cached P2P bid")
 	cached, ok := vs.HighestBidCache.Get(sBlk.Block().Slot(), parentHash, sBlk.Block().ParentRoot())
 	if !ok {
+		log.WithField("slot", sBlk.Block().Slot()).Debug("No cached P2P bid found for slot")
 		return nil
 	}
 

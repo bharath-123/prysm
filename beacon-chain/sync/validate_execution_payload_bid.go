@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/verification"
@@ -13,6 +14,7 @@ import (
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/sirupsen/logrus"
 )
 
 // validateExecutionPayloadBidGossip validates execution payload bids on gossip.
@@ -52,65 +54,100 @@ func (s *Service) validateExecutionPayloadBidGossip(ctx context.Context, pid pee
 		return pubsub.ValidationIgnore, err
 	}
 
+	pbh := bid.ParentBlockHash()
+	pbr := bid.ParentBlockRoot()
+	bh := bid.BlockHash()
+	fr := bid.FeeRecipient()
+	bidLog := log.WithFields(logrus.Fields{
+		"slot":             bid.Slot(),
+		"builderIndex":     bid.BuilderIndex(),
+		"value":            bid.Value(),
+		"executionPayment": bid.ExecutionPayment(),
+		"gasLimit":         bid.GasLimit(),
+		"parentBlockHash":  fmt.Sprintf("%#x", pbh[:]),
+		"parentBlockRoot":  fmt.Sprintf("%#x", pbr[:]),
+		"blockHash":        fmt.Sprintf("%#x", bh[:]),
+		"feeRecipient":     fmt.Sprintf("%#x", fr[:]),
+	})
+	bidLog.Debug("BHARATH: Received execution payload bid via gossip")
+
 	// [IGNORE] bid.slot is the current slot or the next slot.
 	if err := v.VerifyCurrentOrNextSlot(); err != nil {
+		bidLog.WithError(err).Debug("Execution payload bid failed VerifyCurrentOrNextSlot")
 		return pubsub.ValidationIgnore, err
 	}
 	// [IGNORE] the SignedProposerPreferences where preferences.proposal_slot is equal to bid.slot has been seen.
 	pref, ok := s.proposerPreferencesCache.Get(bid.Slot())
 	if !ok {
+		bidLog.Debug("BHARATH: Execution payload bid ignored: no proposer preferences seen for slot")
 		return pubsub.ValidationIgnore, nil
 	}
+	bidLog.WithFields(logrus.Fields{
+		"prefFeeRecipient": fmt.Sprintf("%#x", pref.FeeRecipient),
+		"prefGasLimit":     pref.GasLimit,
+	}).Debug("BHARATH: Found proposer preferences for bid slot")
 	st, err := s.cfg.chain.HeadStateReadOnly(ctx)
 	if err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid failed to get head state")
 		return pubsub.ValidationIgnore, err
 	}
 	// [REJECT] bid.builder_index is a valid/active builder index.
 	if err := v.VerifyBuilderActive(st); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyBuilderActive")
 		return pubsub.ValidationReject, err
 	}
 	// [REJECT] bid.execution_payment is zero.
 	if err := v.VerifyExecutionPaymentZero(); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyExecutionPaymentZero")
 		return pubsub.ValidationReject, err
 	}
 	// [REJECT] bid.fee_recipient matches the fee_recipient from the proposer's SignedProposerPreferences associated with bid.slot.
 	if err := v.VerifyFeeRecipientMatches(pref.FeeRecipient); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyFeeRecipientMatches")
 		return pubsub.ValidationReject, err
 	}
 	// [REJECT] bid.gas_limit matches the gas_limit from the proposer's SignedProposerPreferences associated with bid.slot.
 	if err := v.VerifyGasLimitMatches(pref.GasLimit); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifyGasLimitMatches")
 		return pubsub.ValidationReject, err
 	}
 	// The spec lists signature validation later, but the "first signed bid seen
 	// with a valid signature" gate below depends on knowing validity first.
 	if err := v.VerifySignature(st); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid rejected: VerifySignature")
 		return pubsub.ValidationReject, err
 	}
 
 	// [IGNORE] this is the first signed bid seen with a valid signature from the given builder for this slot.
 	builderKey := executionPayloadBidBuilderKey(bid.Slot(), bid.BuilderIndex())
 	if s.hasSeenExecutionPayloadBidBuilder(builderKey) {
+		bidLog.Debug("BHARATH: Execution payload bid ignored: duplicate builder bid for slot")
 		return pubsub.ValidationIgnore, nil
 	}
 	s.setSeenExecutionPayloadBidBuilder(bid.Slot(), builderKey)
 	// [IGNORE] this bid is the highest value bid seen for the tuple (bid.slot, bid.parent_block_hash, bid.parent_block_root).
 	if !s.isHighestExecutionPayloadBid(bid) {
+		bidLog.Debug("BHARATH: Execution payload bid ignored: not highest value bid")
 		return pubsub.ValidationIgnore, nil
 	}
 	// [IGNORE] bid.value is less or equal than the builder's excess balance.
 	if err := v.VerifyBuilderCanCoverBid(st); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid ignored: VerifyBuilderCanCoverBid")
 		return pubsub.ValidationIgnore, err
 	}
 	// [IGNORE] bid.parent_block_hash is the block hash of a known execution payload in fork choice.
 	if err := v.VerifyParentBlockHash(s.cfg.chain.BlockHash); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid ignored: VerifyParentBlockHash")
 		return pubsub.ValidationIgnore, err
 	}
 	// [IGNORE] bid.parent_block_root is the hash tree root of a known beacon block in fork choice.
 	if err := v.VerifyParentBlockRootSeen(s.cfg.chain.InForkchoice); err != nil {
+		bidLog.WithError(err).Debug("BHARATH: Execution payload bid ignored: VerifyParentBlockRootSeen")
 		return pubsub.ValidationIgnore, err
 	}
 	// [REJECT] signed_execution_payload_bid.signature is valid with respect to the bid.builder_index.
 	// Verified earlier to satisfy the "first valid signed bid seen" condition.
+	bidLog.Debug("BHARATH: Execution payload bid passed all gossip validation checks")
 	msg.ValidatorData = signedBid
 	return pubsub.ValidationAccept, nil
 }
@@ -123,6 +160,12 @@ func (s *Service) executionPayloadBidSubscriber(_ context.Context, msg any) erro
 	if signedBid.Message == nil {
 		return errNilMessage
 	}
+	log.WithFields(logrus.Fields{
+		"slot":         signedBid.Message.Slot,
+		"builderIndex": signedBid.Message.BuilderIndex,
+		"value":        signedBid.Message.Value,
+		"blockHash":    fmt.Sprintf("%#x", signedBid.Message.BlockHash),
+	}).Debug("BHARATH: Execution payload bid accepted and cached via subscriber")
 	s.setHighestExecutionPayloadBid(signedBid)
 	return nil
 }
@@ -144,11 +187,27 @@ func (s *Service) setSeenExecutionPayloadBidBuilder(slot primitives.Slot, key st
 func (s *Service) isHighestExecutionPayloadBid(bid interfaces.ROExecutionPayloadBid) bool {
 	cached, ok := s.highestExecutionPayloadBidCache.Get(bid.Slot(), bid.ParentBlockHash(), bid.ParentBlockRoot())
 	if !ok {
+		log.WithFields(logrus.Fields{
+			"slot":  bid.Slot(),
+			"value": bid.Value(),
+		}).Debug("BHARATH: No cached bid found, this is the highest bid")
 		return true
 	}
-	return bid.Value() > cached.Message.Value
+	isHigher := bid.Value() > cached.Message.Value
+	log.WithFields(logrus.Fields{
+		"slot":        bid.Slot(),
+		"newValue":    bid.Value(),
+		"cachedValue": cached.Message.Value,
+		"isHigher":    isHigher,
+	}).Debug("BHARATH: Comparing bid value against cached highest bid")
+	return isHigher
 }
 
 func (s *Service) setHighestExecutionPayloadBid(signedBid *ethpb.SignedExecutionPayloadBid) {
+	log.WithFields(logrus.Fields{
+		"slot":         signedBid.Message.Slot,
+		"builderIndex": signedBid.Message.BuilderIndex,
+		"value":        signedBid.Message.Value,
+	}).Debug("BHARATH: Setting highest execution payload bid in cache")
 	s.highestExecutionPayloadBidCache.SetIfHigher(signedBid)
 }
