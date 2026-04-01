@@ -16,6 +16,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // LatestBlockHash returns the hash of the latest execution block.
@@ -162,10 +163,14 @@ func (b *BeaconState) CanBuilderCoverBid(builderIndex primitives.BuilderIndex, b
 		return false, err
 	}
 
+	balance := uint64(builder.Balance)
+	logrus.WithFields(logrus.Fields{
+		"builderIndex": builderIndex,
+		"balance":      balance,
+		"bidAmount":    bidAmount,
+	}).Debug("BHARATH: in CanBuilderCoverBid")
 	pendingBalanceToWithdraw := b.builderPendingBalanceToWithdraw(builderIndex)
 	minBalance := params.BeaconConfig().MinDepositAmount + pendingBalanceToWithdraw
-
-	balance := uint64(builder.Balance)
 	if balance < minBalance {
 		return false, nil
 	}

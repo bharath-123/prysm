@@ -8,6 +8,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // ExecutionPayloadBidGossipRequirements defines the list of requirements for gossip execution payload bids.
@@ -168,6 +169,10 @@ func (v *BidVerifier) VerifyBuilderCanCoverBid(st state.ReadOnlyBeaconState) (er
 	if err != nil {
 		return errors.Wrap(err, "failed to get bid")
 	}
+	log.WithFields(logrus.Fields{
+		"builderIndex": bid.BuilderIndex(),
+		"value":        bid.Value(),
+	}).Debug("BHARATH: Verifying builder can cover bid")
 	ok, err := st.CanBuilderCoverBid(bid.BuilderIndex(), bid.Value())
 	if err != nil {
 		return errors.Wrap(err, "builder balance check failed")

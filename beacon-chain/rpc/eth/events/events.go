@@ -807,11 +807,17 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 	}
 
 	if ev.HeadBlock.Version() >= version.Gloas {
-		bh, err := rost.LatestBlockHash()
-		if err != nil {
-			return ev, errors.Wrap(err, "could not get latest block hash from state")
+		// For Gloas, ParentBlockHash may have been pre-populated by the caller
+		// (e.g. from the envelope's execution payload). Only fetch from state
+		// if it hasn't been set, as the state at the beacon block root is
+		// pre-envelope and would return the previous slot's block hash.
+		if len(ev.ParentBlockHash) == 0 {
+			bh, err := rost.LatestBlockHash()
+			if err != nil {
+				return ev, errors.Wrap(err, "could not get latest block hash from state")
+			}
+			ev.ParentBlockHash = bh[:]
 		}
-		ev.ParentBlockHash = bh[:]
 		ev.ParentBlockNumber = 0
 	} else {
 		payload, err := ev.HeadBlock.Block().Body().Execution()
