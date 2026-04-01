@@ -166,6 +166,8 @@ func (s *Service) postPayloadHeadUpdate(ctx context.Context, envelope interfaces
 
 	attr := s.getPayloadAttribute(ctx, st, envelope.Slot()+1, headRoot, blockHash[:])
 	if s.inRegularSync() {
+		nextSlot := envelope.Slot() + 1
+		headRoot32 := [32]byte(root)
 		go func() {
 			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, blockHash, attr)
 			if err != nil {
@@ -175,7 +177,13 @@ func (s *Service) postPayloadHeadUpdate(ctx context.Context, envelope interfaces
 			if attr != nil && !attr.IsEmpty() && pid != nil {
 				var pId [8]byte
 				copy(pId[:], pid[:])
-				s.cfg.PayloadIDCache.Set(envelope.Slot()+1, root, pId)
+				s.cfg.PayloadIDCache.Set(nextSlot, headRoot32, pId)
+				headBlock, err := s.HeadBlock(s.ctx)
+				if err != nil {
+					log.WithError(err).Error("Could not get head block for payload attributes event")
+					return
+				}
+				s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot32, nextSlot)
 			}
 		}()
 	}

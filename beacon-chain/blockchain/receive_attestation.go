@@ -176,6 +176,9 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 				var pId [8]byte
 				copy(pId[:], pid[:])
 				s.cfg.PayloadIDCache.Set(proposingSlot, newHeadRoot, pId)
+				if attr != nil && !attr.IsEmpty() {
+					s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, newHeadRoot, proposingSlot)
+				}
 			}()
 		} else {
 			fcuArgs := &fcuConfig{

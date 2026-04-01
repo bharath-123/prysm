@@ -1199,21 +1199,6 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 		return
 	}
 
-	if headState.Version() >= version.Gloas {
-		bh, err := headState.LatestBlockHash()
-		if err != nil {
-			log.WithError(err).Debug("could not perform late block tasks: failed to retrieve latest block hash")
-			return
-		}
-		id, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attribute)
-		if err != nil {
-			log.WithError(err).Debug("could not perform late block tasks: failed to update forkchoice with engine")
-		}
-		if id != nil {
-			s.cfg.PayloadIDCache.Set(s.CurrentSlot()+1, headRoot, [8]byte(*id))
-		}
-		return
-	}
 	s.headLock.RLock()
 	headBlock, err := s.headBlock()
 	if err != nil {
@@ -1222,6 +1207,24 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 		return
 	}
 	s.headLock.RUnlock()
+
+	if headState.Version() >= version.Gloas {
+		bh, err := headState.LatestBlockHash()
+		if err != nil {
+			log.WithError(err).Debug("could not perform late block tasks: failed to retrieve latest block hash")
+			return
+		}
+		nextSlot := s.CurrentSlot() + 1
+		id, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attribute)
+		if err != nil {
+			log.WithError(err).Debug("could not perform late block tasks: failed to update forkchoice with engine")
+		}
+		if id != nil {
+			s.cfg.PayloadIDCache.Set(nextSlot, headRoot, [8]byte(*id))
+			s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot)
+		}
+		return
+	}
 
 	fcuArgs := &fcuConfig{
 		headState:  headState,
