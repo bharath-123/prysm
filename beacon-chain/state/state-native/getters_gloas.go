@@ -164,11 +164,6 @@ func (b *BeaconState) CanBuilderCoverBid(builderIndex primitives.BuilderIndex, b
 	}
 
 	balance := uint64(builder.Balance)
-	logrus.WithFields(logrus.Fields{
-		"builderIndex": builderIndex,
-		"balance":      balance,
-		"bidAmount":    bidAmount,
-	}).Debug("BHARATH: in CanBuilderCoverBid")
 	pendingBalanceToWithdraw := b.builderPendingBalanceToWithdraw(builderIndex)
 	minBalance := params.BeaconConfig().MinDepositAmount + pendingBalanceToWithdraw
 	if balance < minBalance {

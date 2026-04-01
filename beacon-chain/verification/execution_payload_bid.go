@@ -169,10 +169,6 @@ func (v *BidVerifier) VerifyBuilderCanCoverBid(st state.ReadOnlyBeaconState) (er
 	if err != nil {
 		return errors.Wrap(err, "failed to get bid")
 	}
-	log.WithFields(logrus.Fields{
-		"builderIndex": bid.BuilderIndex(),
-		"value":        bid.Value(),
-	}).Debug("BHARATH: Verifying builder can cover bid")
 	ok, err := st.CanBuilderCoverBid(bid.BuilderIndex(), bid.Value())
 	if err != nil {
 		return errors.Wrap(err, "builder balance check failed")
