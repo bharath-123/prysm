@@ -919,6 +919,16 @@ func (s *Service) beaconEndpoints(
 			handler: server.PublishExecutionPayloadBid,
 			methods: []string{http.MethodPost},
 		},
+		{
+			template: "/eth/v1/builder/execution_payload_envelope",
+			name:     namespace + ".ConstructExecutionPayloadEnvelope",
+			middleware: []middleware.Middleware{
+				middleware.ContentTypeHandler([]string{api.JsonMediaType}),
+				middleware.AcceptHeaderHandler([]string{api.JsonMediaType}),
+			},
+			handler: server.ConstructExecutionPayloadEnvelope,
+			methods: []string{http.MethodPost},
+		},
 	}
 }
 

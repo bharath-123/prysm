@@ -292,6 +292,17 @@ type GetExecutionPayloadEnvelopeResponse struct {
 	Data                *SignedExecutionPayloadEnvelope `json:"data"`
 }
 
+type ConstructExecutionPayloadEnvelopeRequest struct {
+	BeaconBlockRoot   string                 `json:"beacon_block_root"`
+	ExecutionPayload  *ExecutionPayloadDeneb `json:"execution_payload"`
+	ExecutionRequests *ExecutionRequests     `json:"execution_requests"`
+}
+
+type ConstructExecutionPayloadEnvelopeResponse struct {
+	Version string                    `json:"version"`
+	Data    *ExecutionPayloadEnvelope `json:"data"`
+}
+
 type SSZQueryRequest struct {
 	Query        string `json:"query"`
 	IncludeProof bool   `json:"include_proof,omitempty"`
