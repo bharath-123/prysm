@@ -52,7 +52,7 @@ func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer
 	}
 	e, err := blocks.WrappedROSignedExecutionPayloadEnvelope(signedEnvelope)
 	if err != nil {
-		log.WithError(err).Error("failed to create read only signed payload execution envelope")
+		log.WithError(err).Error("Failed to create read only signed payload execution envelope")
 		return pubsub.ValidationIgnore, err
 	}
 	v := s.newExecutionPayloadEnvelopeVerifier(e, verification.GossipExecutionPayloadEnvelopeRequirements)
@@ -264,7 +264,7 @@ func (s *Service) executionPayloadEnvelopeSubscriber(ctx context.Context, msg an
 			if envErr == nil {
 				s.setBadPayload(ctx, envelope.BeaconBlockRoot())
 			} else {
-				log.WithError(envErr).Error("failed to get envelope from signed execution payload envelope")
+				log.WithError(envErr).Error("Failed to get envelope from signed execution payload envelope")
 			}
 		}
 		return err
