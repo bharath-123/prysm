@@ -3284,6 +3284,59 @@ func (d *PayloadAttestationData) ToConsensus() (*eth.PayloadAttestationData, err
 	}, nil
 }
 
+// ToConsensus converts the API SignedExecutionPayloadEnvelope to its proto representation.
+func (e *SignedExecutionPayloadEnvelope) ToConsensus() (*eth.SignedExecutionPayloadEnvelope, error) {
+	if e == nil {
+		return nil, errNilValue
+	}
+	sig, err := bytesutil.DecodeHexWithLength(e.Signature, fieldparams.BLSSignatureLength)
+	if err != nil {
+		return nil, server.NewDecodeError(err, "Signature")
+	}
+	if e.Message == nil {
+		return nil, server.NewDecodeError(errNilValue, "Message")
+	}
+	msg := e.Message
+	payload, err := msg.Payload.ToConsensus()
+	if err != nil {
+		return nil, server.NewDecodeError(err, "Message.Payload")
+	}
+	var requests *enginev1.ExecutionRequests
+	if msg.ExecutionRequests != nil {
+		requests, err = msg.ExecutionRequests.ToConsensus()
+		if err != nil {
+			return nil, server.NewDecodeError(err, "Message.ExecutionRequests")
+		}
+	}
+	builderIndex, err := strconv.ParseUint(msg.BuilderIndex, 10, 64)
+	if err != nil {
+		return nil, server.NewDecodeError(err, "Message.BuilderIndex")
+	}
+	beaconBlockRoot, err := bytesutil.DecodeHexWithLength(msg.BeaconBlockRoot, fieldparams.RootLength)
+	if err != nil {
+		return nil, server.NewDecodeError(err, "Message.BeaconBlockRoot")
+	}
+	slot, err := strconv.ParseUint(msg.Slot, 10, 64)
+	if err != nil {
+		return nil, server.NewDecodeError(err, "Message.Slot")
+	}
+	stateRoot, err := bytesutil.DecodeHexWithLength(msg.StateRoot, fieldparams.RootLength)
+	if err != nil {
+		return nil, server.NewDecodeError(err, "Message.StateRoot")
+	}
+	return &eth.SignedExecutionPayloadEnvelope{
+		Message: &eth.ExecutionPayloadEnvelope{
+			Payload:           payload,
+			ExecutionRequests: requests,
+			BuilderIndex:      primitives.BuilderIndex(builderIndex),
+			BeaconBlockRoot:   beaconBlockRoot,
+			Slot:              primitives.Slot(slot),
+			StateRoot:         stateRoot,
+		},
+		Signature: sig,
+	}, nil
+}
+
 // SignedExecutionPayloadEnvelopeFromConsensus converts a proto envelope to the API struct.
 func SignedExecutionPayloadEnvelopeFromConsensus(e *eth.SignedExecutionPayloadEnvelope) (*SignedExecutionPayloadEnvelope, error) {
 	payload, err := ExecutionPayloadDenebFromConsensus(e.Message.Payload)

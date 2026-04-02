@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
@@ -20,6 +21,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer.ID, msg *pubsub.Message) (pubsub.ValidationResult, error) {
@@ -60,14 +62,26 @@ func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer
 		return pubsub.ValidationIgnore, err
 	}
 
+	bbr := env.BeaconBlockRoot()
+	bh := env.BlockHash()
+	envLog := log.WithFields(logrus.Fields{
+		"slot":         env.Slot(),
+		"builderIndex": env.BuilderIndex(),
+		"beaconBlockRoot": fmt.Sprintf("%#x", bbr[:]),
+		"blockHash":    fmt.Sprintf("%#x", bh[:]),
+	})
+	envLog.Debug("BHARATH: Received execution payload envelope via gossip")
+
 	// [IGNORE] The envelope's block root envelope.block_root has been seen (via gossip or non-gossip sources)
 	// (a client MAY queue payload for processing once the block is retrieved).
 	if err := v.VerifyBlockRootSeen(func(root [32]byte) bool { return s.cfg.chain.HasBlock(ctx, root) }); err != nil {
+		envLog.WithError(err).Debug("BHARATH: Execution payload envelope ignored: VerifyBlockRootSeen failed, queuing pending")
 		return s.queuePendingPayloadEnvelope(ctx, v, env, signedEnvelope)
 	}
 	root := env.BeaconBlockRoot()
 	// [IGNORE] The node has not seen another valid SignedExecutionPayloadEnvelope for this block root from this builder.
 	if s.hasSeenPayloadEnvelope(root, env.BuilderIndex()) {
+		envLog.Debug("BHARATH: Execution payload envelope ignored: already seen envelope for this block root and builder")
 		return pubsub.ValidationIgnore, nil
 	}
 	finalized := s.cfg.chain.FinalizedCheckpt()
@@ -77,10 +91,12 @@ func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer
 	// [IGNORE] The envelope is from a slot greater than or equal to the latest finalized slot --
 	// i.e. validate that envelope.slot >= compute_start_slot_at_epoch(store.finalized_checkpoint.epoch).
 	if err := v.VerifySlotAboveFinalized(finalized.Epoch); err != nil {
+		envLog.WithError(err).Debug("BHARATH: Execution payload envelope ignored: VerifySlotAboveFinalized")
 		return pubsub.ValidationIgnore, err
 	}
 	// [REJECT] block passes validation.
 	if err := v.VerifyBlockRootValid(s.hasBadBlock); err != nil {
+		envLog.WithError(err).Debug("BHARATH: Execution payload envelope rejected: VerifyBlockRootValid")
 		return pubsub.ValidationReject, err
 	}
 
@@ -91,6 +107,7 @@ func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer
 	}
 	// [REJECT] block.slot equals envelope.slot.
 	if err := v.VerifySlotMatchesBlock(block.Block().Slot()); err != nil {
+		envLog.WithField("blockSlot", block.Block().Slot()).WithError(err).Debug("BHARATH: Execution payload envelope rejected: VerifySlotMatchesBlock")
 		return pubsub.ValidationReject, err
 	}
 
@@ -108,12 +125,19 @@ func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer
 	if err != nil {
 		return pubsub.ValidationIgnore, err
 	}
+	bidBH := bid.BlockHash()
+	envLog.WithFields(logrus.Fields{
+		"bidBuilderIndex": bid.BuilderIndex(),
+		"bidBlockHash":    fmt.Sprintf("%#x", bidBH[:]),
+	}).Debug("BHARATH: Comparing envelope against committed bid")
 	// [REJECT] envelope.builder_index == bid.builder_index.
 	if err := v.VerifyBuilderValid(bid); err != nil {
+		envLog.WithError(err).Debug("BHARATH: Execution payload envelope rejected: VerifyBuilderValid")
 		return pubsub.ValidationReject, err
 	}
 	// [REJECT] payload.block_hash == bid.block_hash.
 	if err := v.VerifyPayloadHash(bid); err != nil {
+		envLog.WithError(err).Debug("BHARATH: Execution payload envelope rejected: VerifyPayloadHash")
 		return pubsub.ValidationReject, err
 	}
 
@@ -126,6 +150,7 @@ func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer
 
 	// [REJECT] signed_execution_payload_envelope.signature is valid with respect to the builder's public key.
 	if err := v.VerifySignature(st); err != nil {
+		envLog.WithError(err).Debug("BHARATH: Execution payload envelope rejected: VerifySignature")
 		return pubsub.ValidationReject, err
 	}
 	s.setSeenPayloadEnvelope(root, env.BuilderIndex())
@@ -134,8 +159,9 @@ func (s *Service) validateExecutionPayloadEnvelope(ctx context.Context, pid peer
 	if err == nil {
 		syncExecutionPayloadEnvelopeArrivalDelaySeconds.Observe(receivedTime.Sub(startTime).Seconds())
 	} else {
-		log.WithError(err).WithField("slot", env.Slot()).Debug("Could not compute execution payload envelope slot start time")
+		log.WithError(err).WithField("slot", env.Slot()).Debug("BHARATH: Could not compute execution payload envelope slot start time")
 	}
+	envLog.Debug("BHARATH: Execution payload envelope passed all gossip validation checks")
 	return pubsub.ValidationAccept, nil
 }
 

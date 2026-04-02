@@ -143,6 +143,63 @@ func (s *Server) GetExecutionPayloadEnvelope(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// PublishExecutionPayloadEnvelope broadcasts a signed execution payload envelope to the p2p network.
+//
+// POST /eth/v1/beacon/execution_payload_envelope
+func (s *Server) PublishExecutionPayloadEnvelope(w http.ResponseWriter, r *http.Request) {
+	ctx, span := trace.StartSpan(r.Context(), "beacon.PublishExecutionPayloadEnvelope")
+	defer span.End()
+
+	if s.SyncChecker.Syncing() {
+		httputil.HandleError(w, "Beacon node is syncing", http.StatusServiceUnavailable)
+		return
+	}
+
+	versionHeader := r.Header.Get(api.VersionHeader)
+	if versionHeader != version.String(version.Gloas) {
+		httputil.HandleError(w, "Eth-Consensus-Version header must be \""+version.String(version.Gloas)+"\"", http.StatusBadRequest)
+		return
+	}
+
+	var signedEnvelope *eth.SignedExecutionPayloadEnvelope
+	if httputil.IsRequestSsz(r) {
+		body, err := readRequestBody(r)
+		if err != nil {
+			httputil.HandleError(w, "could not read request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		pb := &eth.SignedExecutionPayloadEnvelope{}
+		if err := pb.UnmarshalSSZ(body); err != nil {
+			httputil.HandleError(w, "could not decode SSZ request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		signedEnvelope = pb
+	} else {
+		var req structs.SignedExecutionPayloadEnvelope
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httputil.HandleError(w, "could not decode JSON request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		pb, err := req.ToConsensus()
+		if err != nil {
+			httputil.HandleError(w, "could not convert request to consensus type: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		signedEnvelope = pb
+	}
+
+	if signedEnvelope.Message == nil {
+		httputil.HandleError(w, "signed execution payload envelope message is nil", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.Broadcaster.Broadcast(ctx, signedEnvelope); err != nil {
+		httputil.HandleError(w, "could not broadcast signed execution payload envelope: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // ConstructExecutionPayloadEnvelope accepts an execution payload and execution requests from a
 // builder, computes the resulting post-envelope state root, and returns the complete
 // ExecutionPayloadEnvelope ready for the builder to sign and broadcast.

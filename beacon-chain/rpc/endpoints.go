@@ -929,6 +929,15 @@ func (s *Service) beaconEndpoints(
 			handler: server.ConstructExecutionPayloadEnvelope,
 			methods: []string{http.MethodPost},
 		},
+		{
+			template: "/eth/v1/beacon/execution_payload_envelope",
+			name:     namespace + ".PublishExecutionPayloadEnvelope",
+			middleware: []middleware.Middleware{
+				middleware.ContentTypeHandler([]string{api.JsonMediaType, api.OctetStreamMediaType}),
+			},
+			handler: server.PublishExecutionPayloadEnvelope,
+			methods: []string{http.MethodPost},
+		},
 	}
 }
 
