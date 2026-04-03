@@ -548,6 +548,7 @@ func (s *Service) beaconEndpoints(
 		ForkchoiceFetcher:       s.cfg.ForkchoiceFetcher,
 		CoreService:             coreService,
 		AttestationStateFetcher: s.cfg.AttestationReceiver,
+		DataColumnReceiver:      s.cfg.DataColumnReceiver,
 	}
 
 	const namespace = "beacon"

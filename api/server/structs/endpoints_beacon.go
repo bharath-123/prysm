@@ -298,6 +298,19 @@ type ConstructExecutionPayloadEnvelopeRequest struct {
 	ExecutionRequests *ExecutionRequests     `json:"execution_requests"`
 }
 
+// PublishExecutionPayloadEnvelopeRequest wraps a SignedExecutionPayloadEnvelope
+// with optional blob data. When blobs are provided the beacon node computes
+// data column sidecars and broadcasts them to the network.
+type PublishExecutionPayloadEnvelopeRequest struct {
+	SignedExecutionPayloadEnvelope
+	// Blobs are the raw blob data (hex-encoded, one entry per blob).
+	// Required when the envelope carries KZG commitments.
+	Blobs []string `json:"blobs,omitempty"`
+	// CellProofs are the flat cell proofs (hex-encoded).
+	// Each blob contributes NumberOfColumns proofs, so len == len(Blobs) * NumberOfColumns.
+	CellProofs []string `json:"cell_proofs,omitempty"`
+}
+
 type ConstructExecutionPayloadEnvelopeResponse struct {
 	Version string                    `json:"version"`
 	Data    *ExecutionPayloadEnvelope `json:"data"`
