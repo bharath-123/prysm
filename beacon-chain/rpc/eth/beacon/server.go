@@ -47,9 +47,10 @@ type Server struct {
 	CanonicalHistory        *stategen.CanonicalHistory
 	ExecutionReconstructor  execution.Reconstructor
 	FinalizationFetcher     blockchain.FinalizationFetcher
-	DataColumnReceiver      blockchain.DataColumnReceiver
-	BLSChangesPool          blstoexec.PoolManager
-	ForkchoiceFetcher       blockchain.ForkchoiceFetcher
-	CoreService             *core.Service
-	AttestationStateFetcher blockchain.AttestationStateFetcher
+	DataColumnReceiver               blockchain.DataColumnReceiver
+	ExecutionPayloadEnvelopeReceiver blockchain.ExecutionPayloadEnvelopeReceiver
+	BLSChangesPool                   blstoexec.PoolManager
+	ForkchoiceFetcher                blockchain.ForkchoiceFetcher
+	CoreService                      *core.Service
+	AttestationStateFetcher          blockchain.AttestationStateFetcher
 }

@@ -231,6 +231,21 @@ func (s *Server) PublishExecutionPayloadEnvelope(w http.ResponseWriter, r *http.
 		httputil.HandleError(w, "could not broadcast signed execution payload envelope: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Process the envelope locally. libp2p's seen-message cache prevents the node from
+	// re-receiving its own broadcast via gossip, so we must import it into forkchoice explicitly.
+	if s.ExecutionPayloadEnvelopeReceiver != nil {
+		roSigned, err := consensusblocks.WrappedROSignedExecutionPayloadEnvelope(signedEnvelope)
+		if err != nil {
+			httputil.HandleError(w, "could not wrap signed envelope for local processing: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := s.ExecutionPayloadEnvelopeReceiver.ReceiveExecutionPayloadEnvelope(ctx, roSigned); err != nil {
+			httputil.HandleError(w, "could not process envelope locally: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
