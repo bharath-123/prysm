@@ -340,7 +340,7 @@ func TestNotifyForkchoiceUpdateGloas_Valid(t *testing.T) {
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
 	attr := payloadattribute.EmptyWithVersion(version.Gloas)
 
-	retPid, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, attr)
+	retPid, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, attr)
 	require.NoError(t, err)
 	require.DeepEqual(t, pid, retPid)
 }
@@ -352,7 +352,7 @@ func TestNotifyForkchoiceUpdateGloas_Syncing(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil)
+	_, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, nil)
 	require.NoError(t, err)
 }
 
@@ -363,7 +363,7 @@ func TestNotifyForkchoiceUpdateGloas_Invalid(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil)
+	_, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, nil)
 	require.Equal(t, true, IsInvalidBlock(err))
 }
 
@@ -372,7 +372,7 @@ func TestNotifyForkchoiceUpdateGloas_NilAttributes(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil)
+	_, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, nil)
 	require.NoError(t, err)
 }
 
@@ -723,18 +723,14 @@ func TestLateBlockTasks_GloasFCU(t *testing.T) {
 	service, tr := setupGloasService(t, &mockExecution.EngineClient{PayloadIDBytes: pid})
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	base, blk := testGloasState(t, 1, params.BeaconConfig().ZeroHash, blockHash)
+	base, _ := testGloasState(t, 1, params.BeaconConfig().ZeroHash, blockHash)
 	base.LatestBlockHash = blockHash[:]
 	st, err := state_native.InitializeFromProtoUnsafeGloas(base)
-	require.NoError(t, err)
-
-	signed, err := blocks.NewSignedBeaconBlock(blk)
 	require.NoError(t, err)
 
 	headRoot := bytesutil.ToBytes32([]byte("headroot"))
 	service.head = &head{
 		root:  headRoot,
-		block: signed,
 		state: st,
 		slot:  1,
 	}
@@ -937,7 +933,7 @@ func TestLateBlockTasks_GloasForkBoundary_PreforkBidUsesHeadRoot(t *testing.T) {
 	service, tr := setupGloasService(t, &mockExecution.EngineClient{PayloadIDBytes: pid})
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	base, blk := testGloasState(t, 1, params.BeaconConfig().ZeroHash, blockHash)
+	base, _ := testGloasState(t, 1, params.BeaconConfig().ZeroHash, blockHash)
 	// Make IsParentBlockFull() true: bid.BlockHash == LatestBlockHash.
 	base.LatestBlockHash = blockHash[:]
 	// bid.Slot is 0 (pre-fork epoch): the epoch guard should prevent using LatestBlockHash as accessRoot.
@@ -945,13 +941,9 @@ func TestLateBlockTasks_GloasForkBoundary_PreforkBidUsesHeadRoot(t *testing.T) {
 	st, err := state_native.InitializeFromProtoUnsafeGloas(base)
 	require.NoError(t, err)
 
-	signed, err := blocks.NewSignedBeaconBlock(blk)
-	require.NoError(t, err)
-
 	headRoot := bytesutil.ToBytes32([]byte("headroot"))
 	service.head = &head{
 		root:  headRoot,
-		block: signed,
 		state: st,
 		slot:  1,
 	}
