@@ -1215,13 +1215,12 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 			return
 		}
 		nextSlot := s.CurrentSlot() + 1
-		id, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attribute)
+		id, err := s.notifyForkchoiceUpdateGloas(ctx, headBlock, headRoot, bh, nextSlot, attribute)
 		if err != nil {
 			log.WithError(err).Debug("could not perform late block tasks: failed to update forkchoice with engine")
 		}
 		if id != nil {
 			s.cfg.PayloadIDCache.Set(nextSlot, headRoot, [8]byte(*id))
-			s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot)
 		}
 		return
 	}

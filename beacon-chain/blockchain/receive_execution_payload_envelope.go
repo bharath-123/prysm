@@ -169,7 +169,12 @@ func (s *Service) postPayloadHeadUpdate(ctx context.Context, envelope interfaces
 		nextSlot := envelope.Slot() + 1
 		headRoot32 := [32]byte(root)
 		go func() {
-			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, blockHash, attr)
+			headBlock, err := s.HeadBlock(s.ctx)
+			if err != nil {
+				log.WithError(err).Error("Could not get head block for forkchoice update")
+				return
+			}
+			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, headRoot32, blockHash, nextSlot, attr)
 			if err != nil {
 				log.WithError(err).Error("Could not notify forkchoice update")
 				return
@@ -178,12 +183,6 @@ func (s *Service) postPayloadHeadUpdate(ctx context.Context, envelope interfaces
 				var pId [8]byte
 				copy(pId[:], pid[:])
 				s.cfg.PayloadIDCache.Set(nextSlot, headRoot32, pId)
-				headBlock, err := s.HeadBlock(s.ctx)
-				if err != nil {
-					log.WithError(err).Error("Could not get head block for payload attributes event")
-					return
-				}
-				s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot32, nextSlot)
 			}
 		}()
 	}
@@ -333,7 +332,19 @@ func (s *Service) savePostPayload(ctx context.Context, signed interfaces.ROSigne
 
 // notifyForkchoiceUpdateGloas takes the block hash directly because Gloas
 // blocks don't carry an execution payload in the body.
-func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32]byte, attributes payloadattribute.Attributer) (*enginev1.PayloadIDBytes, error) {
+//
+// headBlock, headRoot and nextSlot describe the beacon-side context that
+// corresponds to blockHash and are used solely to emit the payload_attributes
+// SSE event on a successful FCU with non-empty attributes. Pass a nil
+// headBlock (or zero nextSlot) to skip the event (e.g. from tests).
+func (s *Service) notifyForkchoiceUpdateGloas(
+	ctx context.Context,
+	headBlock interfaces.ReadOnlySignedBeaconBlock,
+	headRoot [32]byte,
+	blockHash [32]byte,
+	nextSlot primitives.Slot,
+	attributes payloadattribute.Attributer,
+) (*enginev1.PayloadIDBytes, error) {
 	ctx, span := trace.StartSpan(ctx, "blockChain.notifyForkchoiceUpdateGloas")
 	defer span.End()
 
@@ -352,6 +363,10 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 
 	payloadID, lastValidHash, err := s.cfg.ExecutionEngineCaller.ForkchoiceUpdated(ctx, fcs, attributes)
 	if err == nil {
+		hasAttr := attributes != nil && !attributes.IsEmpty()
+		if hasAttr && payloadID != nil && headBlock != nil && !headBlock.IsNil() {
+			go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot)
+		}
 		return payloadID, nil
 	}
 

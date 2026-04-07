@@ -200,10 +200,11 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 	}
 	headBlock, err := s.HeadBlock(ctx)
 	if err != nil {
-		log.WithError(err).Error("Could not get head block for payload attributes event")
+		log.WithError(err).Error("Could not get head block to notify engine")
 		return
 	}
-	pid, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attr)
+	nextSlot := currentSlot + 1
+	pid, err := s.notifyForkchoiceUpdateGloas(ctx, headBlock, hr, bh, nextSlot, attr)
 	if err != nil {
 		log.WithError(err).Error("Could not notify forkchoice update")
 		return
@@ -214,7 +215,5 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 	}
 	var pId [8]byte
 	copy(pId[:], pid[:])
-	nextSlot := currentSlot + 1
 	s.cfg.PayloadIDCache.Set(nextSlot, hr, pId)
-	s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, hr, nextSlot)
 }
