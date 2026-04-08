@@ -196,6 +196,16 @@ func ApplyExecutionPayload(
 		return errors.Wrap(err, "could not validate payload withdrawals")
 	}
 	if !ok {
+		expectedWithdrawals, ewErr := st.PayloadExpectedWithdrawals()
+		if ewErr == nil {
+			log.Errorf("WITHDRAWAL-DEBUG: mismatch: payload has %d withdrawals, state expects %d", len(withdrawals), len(expectedWithdrawals))
+			for i, w := range withdrawals {
+				log.Errorf("WITHDRAWAL-DEBUG: payload[%d] index=%d valIdx=%d addr=%x amount=%d", i, w.Index, w.ValidatorIndex, w.Address, w.Amount)
+			}
+			for i, w := range expectedWithdrawals {
+				log.Errorf("WITHDRAWAL-DEBUG: expected[%d] index=%d valIdx=%d addr=%x amount=%d", i, w.Index, w.ValidatorIndex, w.Address, w.Amount)
+			}
+		}
 		return errors.New("payload withdrawals do not match expected withdrawals")
 	}
 
