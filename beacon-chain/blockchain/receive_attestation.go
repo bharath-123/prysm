@@ -162,8 +162,15 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 			return
 		}
 		if postGloas {
+			// [Modified in Gloas:EIP7732] Do not send payload attributes until we know the
+			// parent envelope status. Attributes are sent when the envelope arrives
+			// (postPayloadHeadUpdate) or the deadline passes (latePayloadTasks).
+			gloasAttr := attr
+			if !full {
+				gloasAttr = nil
+			}
 			go func() {
-				pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, newHeadRoot, newHeadBlockHash, proposingSlot, attr)
+				pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, newHeadRoot, newHeadBlockHash, proposingSlot, gloasAttr)
 				if err != nil {
 					log.WithError(err).Error("Could not update forkchoice with engine")
 				}
