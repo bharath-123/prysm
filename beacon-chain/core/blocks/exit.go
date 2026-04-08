@@ -238,7 +238,7 @@ func verifyBuilderExitAndSignature(st state.ReadOnlyBeaconState, signed *ethpb.S
 	if err != nil {
 		return errors.Wrap(err, "could not check if builder is active")
 	}
-	log.WithFields(map[string]interface{}{
+	log.WithFields(map[string]any{
 		"builderIndex": builderIndex,
 		"isActive":     active,
 	}).Debug("EXIT-DEBUG: builder active check")
@@ -251,7 +251,7 @@ func verifyBuilderExitAndSignature(st state.ReadOnlyBeaconState, signed *ethpb.S
 	if err != nil {
 		return errors.Wrap(err, "could not get builder pending balance to withdraw")
 	}
-	log.WithFields(map[string]interface{}{
+	log.WithFields(map[string]any{
 		"builderIndex":   builderIndex,
 		"pendingBalance": pendingBalance,
 	}).Debug("EXIT-DEBUG: builder pending balance check")
