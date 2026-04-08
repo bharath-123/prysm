@@ -64,6 +64,11 @@ func (p *Pool) PendingExits() ([]*ethpb.SignedVoluntaryExit, error) {
 func (p *Pool) ExitsForInclusion(st state.ReadOnlyBeaconState, slot types.Slot) ([]*ethpb.SignedVoluntaryExit, error) {
 	p.lock.RLock()
 	length := int(min(float64(params.BeaconConfig().MaxVoluntaryExits), float64(p.pending.Len())))
+	log.WithFields(logrus.Fields{
+		"slot":        slot,
+		"pendingLen":  p.pending.Len(),
+		"maxExits":    length,
+	}).Debug("EXIT-DEBUG: ExitsForInclusion called")
 	result := make([]*ethpb.SignedVoluntaryExit, 0, length)
 	node := p.pending.First()
 	for node != nil && len(result) < length {
@@ -104,7 +109,10 @@ func (p *Pool) ExitsForInclusion(st state.ReadOnlyBeaconState, slot types.Slot) 
 			}
 		}
 		if err = blocks.VerifyExitAndSignature(validator, st, exit); err != nil {
-			logrus.WithError(err).Warning("removing invalid exit from pool")
+			log.WithError(err).WithFields(logrus.Fields{
+				"validatorIndex": exit.Exit.ValidatorIndex,
+				"isBuilderIndex": exit.Exit.ValidatorIndex.IsBuilderIndex(),
+			}).Warn("EXIT-DEBUG: removing invalid exit from pool")
 			p.lock.RUnlock()
 			// MarkIncluded removes the invalid exit from the pool
 			p.MarkIncluded(exit)
@@ -119,6 +127,7 @@ func (p *Pool) ExitsForInclusion(st state.ReadOnlyBeaconState, slot types.Slot) 
 		}
 	}
 	p.lock.RUnlock()
+	log.WithField("exitsReturned", len(result)).Debug("EXIT-DEBUG: ExitsForInclusion returning")
 	return result, nil
 }
 
@@ -129,11 +138,18 @@ func (p *Pool) InsertVoluntaryExit(exit *ethpb.SignedVoluntaryExit) {
 
 	_, exists := p.m[exit.Exit.ValidatorIndex]
 	if exists {
+		log.WithField("validatorIndex", exit.Exit.ValidatorIndex).Debug("EXIT-DEBUG: exit already in pool, skipping insert")
 		return
 	}
 
 	p.pending.Append(doublylinkedlist.NewNode(exit))
 	p.m[exit.Exit.ValidatorIndex] = p.pending.Last()
+	log.WithFields(logrus.Fields{
+		"validatorIndex": exit.Exit.ValidatorIndex,
+		"isBuilderIndex": exit.Exit.ValidatorIndex.IsBuilderIndex(),
+		"epoch":          exit.Exit.Epoch,
+		"poolSize":       p.pending.Len(),
+	}).Debug("EXIT-DEBUG: exit inserted into pool")
 }
 
 // MarkIncluded is used when an exit has been included in a beacon block. Every block seen by this

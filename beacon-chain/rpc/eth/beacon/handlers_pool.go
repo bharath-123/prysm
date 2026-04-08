@@ -480,11 +480,23 @@ func (s *Server) SubmitVoluntaryExit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.WithFields(logrus.Fields{
+		"validatorIndex": exit.Exit.ValidatorIndex,
+		"epoch":          exit.Exit.Epoch,
+		"isBuilderIndex": exit.Exit.ValidatorIndex.IsBuilderIndex(),
+	}).Debug("EXIT-DEBUG: received voluntary exit submission")
+
 	headState, err := s.ChainInfoFetcher.HeadState(ctx)
 	if err != nil {
 		httputil.HandleError(w, "Could not get head state: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	log.WithFields(logrus.Fields{
+		"headSlot":    headState.Slot(),
+		"headVersion": version.String(headState.Version()),
+	}).Debug("EXIT-DEBUG: head state fetched")
+
 	epochStart, err := slots.EpochStart(exit.Exit.Epoch)
 	if err != nil {
 		httputil.HandleError(w, "Could not get epoch start: "+err.Error(), http.StatusInternalServerError)
@@ -499,12 +511,15 @@ func (s *Server) SubmitVoluntaryExit(w http.ResponseWriter, r *http.Request) {
 	// Builder exits are only valid from Gloas onwards.
 	if exit.Exit.ValidatorIndex.IsBuilderIndex() {
 		if headState.Version() < version.Gloas {
+			log.Debug("EXIT-DEBUG: builder exit rejected, state version pre-Gloas")
 			httputil.HandleError(w, "Builder exits not supported before Gloas", http.StatusBadRequest)
 			return
 		}
+		log.WithField("builderIndex", exit.Exit.ValidatorIndex.ToBuilderIndex()).Debug("EXIT-DEBUG: identified as builder exit")
 	}
 	var val state.ReadOnlyValidator
 	if !exit.Exit.ValidatorIndex.IsBuilderIndex() {
+		log.WithField("validatorIndex", exit.Exit.ValidatorIndex).Debug("EXIT-DEBUG: identified as validator exit (NOT builder)")
 		val, err = headState.ValidatorAtIndexReadOnly(exit.Exit.ValidatorIndex)
 		if err != nil {
 			if errors.Is(err, mvslice.ErrOutOfBounds) {
@@ -516,15 +531,18 @@ func (s *Server) SubmitVoluntaryExit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err = blocks.VerifyExitAndSignature(val, headState, exit); err != nil {
+		log.WithError(err).WithField("isBuilderIndex", exit.Exit.ValidatorIndex.IsBuilderIndex()).Debug("EXIT-DEBUG: exit verification failed")
 		httputil.HandleError(w, "Invalid exit: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	log.WithField("validatorIndex", exit.Exit.ValidatorIndex).Debug("EXIT-DEBUG: exit verified, inserting into pool")
 	s.VoluntaryExitsPool.InsertVoluntaryExit(exit)
 	if err = s.Broadcaster.Broadcast(ctx, exit); err != nil {
 		httputil.HandleError(w, "Could not broadcast exit: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	log.WithField("validatorIndex", exit.Exit.ValidatorIndex).Debug("EXIT-DEBUG: exit broadcast complete")
 }
 
 // SubmitSyncCommitteeSignatures submits sync committee signature objects to the node.

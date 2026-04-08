@@ -224,9 +224,12 @@ func verifyBuilderExitAndSignature(st state.ReadOnlyBeaconState, signed *ethpb.S
 	exit := signed.Exit
 	builderIndex := exit.ValidatorIndex.ToBuilderIndex()
 
+	log.WithField("builderIndex", builderIndex).Debug("EXIT-DEBUG: verifying builder exit")
+
 	// Exits must specify an epoch when they become valid; they are not valid before then.
 	currentEpoch := slots.ToEpoch(st.Slot())
 	if currentEpoch < exit.Epoch {
+		log.WithField("builderIndex", builderIndex).Debugf("EXIT-DEBUG: builder exit epoch in future: current=%d exit=%d", currentEpoch, exit.Epoch)
 		return fmt.Errorf("expected current epoch >= exit epoch, received %d < %d", currentEpoch, exit.Epoch)
 	}
 
@@ -235,6 +238,10 @@ func verifyBuilderExitAndSignature(st state.ReadOnlyBeaconState, signed *ethpb.S
 	if err != nil {
 		return errors.Wrap(err, "could not check if builder is active")
 	}
+	log.WithFields(map[string]interface{}{
+		"builderIndex": builderIndex,
+		"isActive":     active,
+	}).Debug("EXIT-DEBUG: builder active check")
 	if !active {
 		return fmt.Errorf("builder %d is not active", builderIndex)
 	}
@@ -244,6 +251,10 @@ func verifyBuilderExitAndSignature(st state.ReadOnlyBeaconState, signed *ethpb.S
 	if err != nil {
 		return errors.Wrap(err, "could not get builder pending balance to withdraw")
 	}
+	log.WithFields(map[string]interface{}{
+		"builderIndex":   builderIndex,
+		"pendingBalance": pendingBalance,
+	}).Debug("EXIT-DEBUG: builder pending balance check")
 	if pendingBalance != 0 {
 		return fmt.Errorf("builder %d has pending balance to withdraw: %d", builderIndex, pendingBalance)
 	}
@@ -264,7 +275,9 @@ func verifyBuilderExitAndSignature(st state.ReadOnlyBeaconState, signed *ethpb.S
 		return err
 	}
 	if err := signing.VerifySigningRoot(exit, pubkey[:], signed.Signature, domain); err != nil {
+		log.WithField("builderIndex", builderIndex).Debug("EXIT-DEBUG: builder exit signature verification failed")
 		return signing.ErrSigFailedToVerify
 	}
+	log.WithField("builderIndex", builderIndex).Debug("EXIT-DEBUG: builder exit verified successfully")
 	return nil
 }
