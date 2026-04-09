@@ -763,6 +763,7 @@ func needsFill(ev payloadattribute.EventData) bool {
 
 func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventData) (payloadattribute.EventData, error) {
 	if !needsFill(ev) {
+		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData no fill needed")
 		return ev, nil
 	}
 	if ev.HeadBlock == nil || ev.HeadBlock.IsNil() {
