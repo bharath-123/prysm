@@ -204,7 +204,7 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 		return
 	}
 	nextSlot := currentSlot + 1
-	pid, err := s.notifyForkchoiceUpdateGloas(ctx, headBlock, hr, bh, nextSlot, attr)
+	pid, err := s.notifyForkchoiceUpdateGloas(ctx, headBlock, hr, bh, nextSlot, attr, true)
 	if err != nil {
 		log.WithError(err).Error("Could not notify forkchoice update")
 		return

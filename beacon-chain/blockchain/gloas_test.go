@@ -340,7 +340,7 @@ func TestNotifyForkchoiceUpdateGloas_Valid(t *testing.T) {
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
 	attr := payloadattribute.EmptyWithVersion(version.Gloas)
 
-	retPid, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, attr)
+	retPid, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, attr, false)
 	require.NoError(t, err)
 	require.DeepEqual(t, pid, retPid)
 }
@@ -352,7 +352,7 @@ func TestNotifyForkchoiceUpdateGloas_Syncing(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil)
+	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil, false)
 	require.NoError(t, err)
 }
 
@@ -363,7 +363,7 @@ func TestNotifyForkchoiceUpdateGloas_Invalid(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil)
+	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil, false)
 	require.Equal(t, true, IsInvalidBlock(err))
 }
 
@@ -372,7 +372,7 @@ func TestNotifyForkchoiceUpdateGloas_NilAttributes(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil)
+	_, err := s.notifyForkchoiceUpdateGloas(ctx, nil, [32]byte{}, blockHash, 0, nil, false)
 	require.NoError(t, err)
 }
 
