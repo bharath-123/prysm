@@ -378,6 +378,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(
 						"address":        fmt.Sprintf("%#x", w.Address),
 						"amount":         w.Amount,
 						"withdrawalNum":  i,
+						"nextSlot":       nextSlot,
 					}).Info("DEBUG-SSE: Payload attributes withdrawal")
 				}
 				log.WithFields(logrus.Fields{

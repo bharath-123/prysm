@@ -719,6 +719,15 @@ func (s *Server) computePayloadAttributes(ctx context.Context, st state.ReadOnly
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get withdrawals from head state")
 	}
+	for i, wd := range w {
+		log.WithField("index", wd.Index).
+			WithField("validatorIndex", wd.ValidatorIndex).
+			WithField("address", fmt.Sprintf("%#x", wd.Address)).
+			WithField("amount", wd.Amount).
+			WithField("withdrawalNum", i).
+			Info("DEBUG-SSE: computePayloadAttributes withdrawal")
+	}
+	log.WithField("withdrawals", len(w)).Info("DEBUG-SSE: computePayloadAttributes total withdrawals")
 	if v == version.Capella {
 		return payloadattribute.New(&engine.PayloadAttributesV2{
 			Timestamp:             timestamp,
