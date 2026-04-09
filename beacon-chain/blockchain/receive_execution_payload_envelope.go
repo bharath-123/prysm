@@ -383,6 +383,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(
 				log.WithFields(logrus.Fields{
 					"callerMethod": callerMethod,
 					"withdrawals":  len(withdrawals),
+					"nextSlot":     nextSlot,
 				}).Info("DEBUG-SSE: Firing payload attributes SSE event")
 			}
 			go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot)
