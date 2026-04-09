@@ -174,7 +174,7 @@ func (s *Service) postPayloadHeadUpdate(ctx context.Context, envelope interfaces
 				log.WithError(err).Error("Could not get head block for forkchoice update")
 				return
 			}
-			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, headRoot32, blockHash, nextSlot, attr, true)
+			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, headRoot32, blockHash, nextSlot, attr, true, "postPayloadHeadUpdate")
 			if err != nil {
 				log.WithError(err).Error("Could not notify forkchoice update")
 				return
@@ -345,6 +345,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(
 	nextSlot primitives.Slot,
 	attributes payloadattribute.Attributer,
 	shouldFireEvent bool,
+	callerMethod string,
 ) (*enginev1.PayloadIDBytes, error) {
 	ctx, span := trace.StartSpan(ctx, "blockChain.notifyForkchoiceUpdateGloas")
 	defer span.End()
@@ -366,6 +367,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(
 	if err == nil {
 		hasAttr := attributes != nil && !attributes.IsEmpty()
 		if hasAttr && payloadID != nil && headBlock != nil && !headBlock.IsNil() && shouldFireEvent {
+			log.WithField("callerMethod", callerMethod).Info("DEBUG-FIRING: Firing payload attributes SSE event")
 			go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot)
 		}
 		return payloadID, nil

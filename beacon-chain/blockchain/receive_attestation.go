@@ -170,7 +170,7 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 				gloasAttr = nil
 			}
 			go func() {
-				pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, newHeadRoot, newHeadBlockHash, proposingSlot, gloasAttr, false)
+				pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, newHeadRoot, newHeadBlockHash, proposingSlot, gloasAttr, true, "processAttestations")
 				if err != nil {
 					log.WithError(err).Error("Could not update forkchoice with engine")
 				}
