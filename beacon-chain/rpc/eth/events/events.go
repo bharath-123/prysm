@@ -20,6 +20,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/transition"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/config/params"
+	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
 	payloadattribute "github.com/OffchainLabs/prysm/v7/consensus-types/payload-attribute"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
@@ -692,7 +693,6 @@ var errUnsupportedPayloadAttribute = errors.New("cannot compute payload attribut
 var errPayloadAttributeExpired = errors.New("skipping payload attribute event for past slot")
 
 func (s *Server) computePayloadAttributes(ctx context.Context, st state.ReadOnlyBeaconState, root [32]byte, proposer primitives.ValidatorIndex, timestamp uint64, randao []byte) (payloadattribute.Attributer, error) {
-	
 	v := st.Version()
 	if v < version.Bellatrix {
 		return nil, errors.Wrapf(errUnsupportedPayloadAttribute, "%s is not supported", version.String(v))
@@ -787,40 +787,67 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 
 	var rost state.ReadOnlyBeaconState
 
-	// If head is in the same block as the proposal slot, we can use the "read only" state cache.
 	pse := slots.ToEpoch(ev.ProposalSlot)
-	if slots.ToEpoch(ev.HeadBlock.Block().Slot()) == pse {
-		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData trying cached state")
-		rost = s.StateGen.StateByRootIfCachedNoCopy(ev.HeadRoot)
+
+	// [Modified in Gloas:EIP7732] If the event carries a ParentBlockHash (the execution
+	// block hash), fetch the post-envelope state saved under that key. This state
+	// includes mutations from ApplyExecutionPayloadStateMutations (withdrawal
+	// queue updates, latest block hash, etc.) and produces correct withdrawals
+	// for the next payload. Fall back to the beacon block root state if the
+	// post-envelope state is not available.
+	if ev.HeadBlock.Version() >= version.Gloas && len(ev.ParentBlockHash) > 0 {
+		blockHash := bytesutil.ToBytes32(ev.ParentBlockHash)
+		log.WithField("proposalSlot", ev.ProposalSlot).
+			WithField("parentBlockHash", fmt.Sprintf("%#x", ev.ParentBlockHash)).
+			Info("DEBUG-SSE: fillEventData trying post-envelope state by block hash")
+		st, err := s.StateGen.StateByRoot(ctx, blockHash)
+		if err == nil && st != nil && !st.IsNil() {
+			log.WithField("proposalSlot", ev.ProposalSlot).
+				WithField("stateSlot", st.Slot()).
+				Info("DEBUG-SSE: fillEventData using post-envelope state")
+			rost = st
+		} else {
+			log.WithField("proposalSlot", ev.ProposalSlot).
+				WithField("err", err).
+				Warn("DEBUG-SSE: fillEventData post-envelope state not available, falling back to beacon root")
+		}
 	}
 
-	// If rost is nil, we couldn't get the state from the cache, or it isn't in the same epoch.
 	if rost == nil || rost.IsNil() {
-		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData fetching state by root")
-		st, err := s.StateGen.StateByRoot(ctx, ev.HeadRoot)
-		if err != nil {
-			log.WithError(err).Error("DEBUG-SSE: fillEventData StateByRoot failed")
-			return ev, errors.Wrap(err, "could not get head state")
-		}
-		log.WithField("proposalSlot", ev.ProposalSlot).WithField("stateSlot", st.Slot()).Info("DEBUG-SSE: fillEventData got state")
-
-		// Double check that we need to process_slots, just in case we got here via a hot state cache miss.
-		if slots.ToEpoch(st.Slot()) < pse {
-			start, err := slots.EpochStart(pse)
-			if err != nil {
-				return ev, errors.Wrap(err, "invalid state slot; could not compute epoch start")
-			}
-			log.WithField("proposalSlot", ev.ProposalSlot).WithField("processToSlot", start).Info("DEBUG-SSE: fillEventData processing slots")
-			st, err = transition.ProcessSlotsUsingNextSlotCache(ctx, st, ev.HeadRoot[:], start)
-			if err != nil {
-				log.WithError(err).Error("DEBUG-SSE: fillEventData ProcessSlotsUsingNextSlotCache failed")
-				return ev, errors.Wrap(err, "could not run process blocks on head state into the proposal slot epoch")
-			}
+		// If head is in the same block as the proposal slot, we can use the "read only" state cache.
+		if slots.ToEpoch(ev.HeadBlock.Block().Slot()) == pse {
+			log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData trying cached state")
+			rost = s.StateGen.StateByRootIfCachedNoCopy(ev.HeadRoot)
 		}
 
-		rost = st
-	} else {
-		log.WithField("proposalSlot", ev.ProposalSlot).WithField("stateSlot", rost.Slot()).Info("DEBUG-SSE: fillEventData using cached state")
+		// If rost is nil, we couldn't get the state from the cache, or it isn't in the same epoch.
+		if rost == nil || rost.IsNil() {
+			log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData fetching state by beacon root")
+			st, err := s.StateGen.StateByRoot(ctx, ev.HeadRoot)
+			if err != nil {
+				log.WithError(err).Error("DEBUG-SSE: fillEventData StateByRoot failed")
+				return ev, errors.Wrap(err, "could not get head state")
+			}
+			log.WithField("proposalSlot", ev.ProposalSlot).WithField("stateSlot", st.Slot()).Info("DEBUG-SSE: fillEventData got state")
+
+			// Double check that we need to process_slots, just in case we got here via a hot state cache miss.
+			if slots.ToEpoch(st.Slot()) < pse {
+				start, err := slots.EpochStart(pse)
+				if err != nil {
+					return ev, errors.Wrap(err, "invalid state slot; could not compute epoch start")
+				}
+				log.WithField("proposalSlot", ev.ProposalSlot).WithField("processToSlot", start).Info("DEBUG-SSE: fillEventData processing slots")
+				st, err = transition.ProcessSlotsUsingNextSlotCache(ctx, st, ev.HeadRoot[:], start)
+				if err != nil {
+					log.WithError(err).Error("DEBUG-SSE: fillEventData ProcessSlotsUsingNextSlotCache failed")
+					return ev, errors.Wrap(err, "could not run process blocks on head state into the proposal slot epoch")
+				}
+			}
+
+			rost = st
+		} else {
+			log.WithField("proposalSlot", ev.ProposalSlot).WithField("stateSlot", rost.Slot()).Info("DEBUG-SSE: fillEventData using cached state")
+		}
 	}
 
 	proposerIndex, err := helpers.BeaconProposerIndexAtSlot(ctx, rost, ev.ProposalSlot)

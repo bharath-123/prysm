@@ -387,7 +387,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(
 					"nextSlot":     nextSlot,
 				}).Info("DEBUG-SSE: Firing payload attributes SSE event")
 			}
-			go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot)
+			go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot, blockHash[:])
 		}
 		return payloadID, nil
 	}
