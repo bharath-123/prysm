@@ -257,6 +257,9 @@ func (es *eventStreamer) recvEventLoop(ctx context.Context, cancel context.Cance
 		case <-ctx.Done():
 			return ctx.Err()
 		case event := <-eventsChan:
+			if _, ok := event.Data.(payloadattribute.EventData); ok {
+				log.WithField("eventType", event.Type).Info("DEBUG-SSE: recvEventLoop received payload_attributes event")
+			}
 			lr, err := s.lazyReaderForEvent(ctx, event, req)
 			if err != nil {
 				if !errors.Is(err, errNotRequested) {
@@ -503,6 +506,7 @@ func (s *Server) lazyReaderForEvent(ctx context.Context, event *feed.Event, topi
 	}
 	switch v := event.Data.(type) {
 	case payloadattribute.EventData:
+		log.WithField("proposalSlot", v.ProposalSlot).Info("DEBUG-SSE: lazyReaderForEvent matched payloadattribute.EventData")
 		return s.payloadAttributesReader(ctx, v)
 	case *ethpb.EventHead:
 		// The head event is a special case because, if the client requested the payload attributes topic,
@@ -688,6 +692,7 @@ var errUnsupportedPayloadAttribute = errors.New("cannot compute payload attribut
 var errPayloadAttributeExpired = errors.New("skipping payload attribute event for past slot")
 
 func (s *Server) computePayloadAttributes(ctx context.Context, st state.ReadOnlyBeaconState, root [32]byte, proposer primitives.ValidatorIndex, timestamp uint64, randao []byte) (payloadattribute.Attributer, error) {
+	
 	v := st.Version()
 	if v < version.Bellatrix {
 		return nil, errors.Wrapf(errUnsupportedPayloadAttribute, "%s is not supported", version.String(v))
@@ -762,14 +767,21 @@ func needsFill(ev payloadattribute.EventData) bool {
 }
 
 func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventData) (payloadattribute.EventData, error) {
+	log.WithField("proposalSlot", ev.ProposalSlot).
+		WithField("hasAttributer", ev.Attributer != nil).
+		WithField("parentBlockHashLen", len(ev.ParentBlockHash)).
+		Info("DEBUG-SSE: fillEventData entered")
 	if !needsFill(ev) {
 		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData no fill needed")
 		return ev, nil
 	}
+	log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData needs fill")
 	if ev.HeadBlock == nil || ev.HeadBlock.IsNil() {
+		log.Warn("DEBUG-SSE: fillEventData head block is nil")
 		return ev, errors.New("head block is nil")
 	}
 	if ev.HeadRoot == zeroRoot {
+		log.Warn("DEBUG-SSE: fillEventData head root is empty")
 		return ev, errors.New("head root is empty")
 	}
 
@@ -778,15 +790,19 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 	// If head is in the same block as the proposal slot, we can use the "read only" state cache.
 	pse := slots.ToEpoch(ev.ProposalSlot)
 	if slots.ToEpoch(ev.HeadBlock.Block().Slot()) == pse {
+		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData trying cached state")
 		rost = s.StateGen.StateByRootIfCachedNoCopy(ev.HeadRoot)
 	}
 
 	// If rost is nil, we couldn't get the state from the cache, or it isn't in the same epoch.
 	if rost == nil || rost.IsNil() {
+		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData fetching state by root")
 		st, err := s.StateGen.StateByRoot(ctx, ev.HeadRoot)
 		if err != nil {
+			log.WithError(err).Error("DEBUG-SSE: fillEventData StateByRoot failed")
 			return ev, errors.Wrap(err, "could not get head state")
 		}
+		log.WithField("proposalSlot", ev.ProposalSlot).WithField("stateSlot", st.Slot()).Info("DEBUG-SSE: fillEventData got state")
 
 		// Double check that we need to process_slots, just in case we got here via a hot state cache miss.
 		if slots.ToEpoch(st.Slot()) < pse {
@@ -794,39 +810,44 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 			if err != nil {
 				return ev, errors.Wrap(err, "invalid state slot; could not compute epoch start")
 			}
-
+			log.WithField("proposalSlot", ev.ProposalSlot).WithField("processToSlot", start).Info("DEBUG-SSE: fillEventData processing slots")
 			st, err = transition.ProcessSlotsUsingNextSlotCache(ctx, st, ev.HeadRoot[:], start)
 			if err != nil {
+				log.WithError(err).Error("DEBUG-SSE: fillEventData ProcessSlotsUsingNextSlotCache failed")
 				return ev, errors.Wrap(err, "could not run process blocks on head state into the proposal slot epoch")
 			}
 		}
 
 		rost = st
+	} else {
+		log.WithField("proposalSlot", ev.ProposalSlot).WithField("stateSlot", rost.Slot()).Info("DEBUG-SSE: fillEventData using cached state")
 	}
 
 	proposerIndex, err := helpers.BeaconProposerIndexAtSlot(ctx, rost, ev.ProposalSlot)
 	if err != nil {
+		log.WithError(err).Error("DEBUG-SSE: fillEventData BeaconProposerIndexAtSlot failed")
 		return ev, errors.Wrap(err, "failed to compute proposer index")
 	}
+	log.WithField("proposalSlot", ev.ProposalSlot).WithField("proposerIndex", proposerIndex).Info("DEBUG-SSE: fillEventData got proposer index")
 
 	ev.ProposerIndex = proposerIndex
 
 	randao, err := helpers.RandaoMix(rost, pse)
 	if err != nil {
+		log.WithError(err).Error("DEBUG-SSE: fillEventData RandaoMix failed")
 		return ev, errors.Wrap(err, "could not get head state randado")
 	}
 
 	if ev.HeadBlock.Version() >= version.Gloas {
-		// For Gloas, ParentBlockHash may have been pre-populated by the caller
-		// (e.g. from the envelope's execution payload). Only fetch from state
-		// if it hasn't been set, as the state at the beacon block root is
-		// pre-envelope and would return the previous slot's block hash.
 		if len(ev.ParentBlockHash) == 0 {
 			bh, err := rost.LatestBlockHash()
 			if err != nil {
 				return ev, errors.Wrap(err, "could not get latest block hash from state")
 			}
 			ev.ParentBlockHash = bh[:]
+			log.WithField("proposalSlot", ev.ProposalSlot).WithField("parentBlockHash", fmt.Sprintf("%#x", ev.ParentBlockHash)).Info("DEBUG-SSE: fillEventData set parentBlockHash from state")
+		} else {
+			log.WithField("proposalSlot", ev.ProposalSlot).WithField("parentBlockHash", fmt.Sprintf("%#x", ev.ParentBlockHash)).Info("DEBUG-SSE: fillEventData parentBlockHash already set")
 		}
 		ev.ParentBlockNumber = 0
 	} else {
@@ -843,6 +864,7 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 		return ev, errors.Wrap(err, "could not get head state slot time")
 	}
 
+	log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData calling computePayloadAttributes")
 	ev.Attributer, err = s.computePayloadAttributes(ctx, rost, ev.HeadRoot, ev.ProposerIndex, uint64(t.Unix()), randao)
 	return ev, err
 }
@@ -850,13 +872,17 @@ func (s *Server) fillEventData(ctx context.Context, ev payloadattribute.EventDat
 // This event stream is intended to be used by builders and relays.
 // Parent fields are based on state at N_{current_slot}, while the rest of fields are based on state of N_{current_slot + 1}
 func (s *Server) payloadAttributesReader(ctx context.Context, ev payloadattribute.EventData) (lazyReader, error) {
+	log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: payloadAttributesReader entered")
 	deadline, err := slots.StartTime(s.ChainInfoFetcher.GenesisTime(), ev.ProposalSlot)
 	if err != nil {
+		log.WithError(err).Error("DEBUG-SSE: payloadAttributesReader failed to determine slot start time")
 		return nil, fmt.Errorf("failed to determine slot start time: %w", err)
 	}
 	if deadline.Before(time.Now()) {
+		log.WithField("proposalSlot", ev.ProposalSlot).WithField("deadline", deadline.Unix()).WithField("now", time.Now().Unix()).Warn("DEBUG-SSE: payloadAttributesReader expired")
 		return nil, errors.Wrapf(errPayloadAttributeExpired, "proposal slot time %d", deadline.Unix())
 	}
+	log.WithField("proposalSlot", ev.ProposalSlot).WithField("deadline", deadline.Unix()).Info("DEBUG-SSE: payloadAttributesReader deadline OK, launching goroutine")
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	edc := make(chan asyncPayloadAttrData)
 	go func() {
@@ -864,14 +890,18 @@ func (s *Server) payloadAttributesReader(ctx context.Context, ev payloadattribut
 		defer func() {
 			edc <- d
 		}()
+		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: payloadAttributesReader goroutine calling fillEventData")
 		ev, err := s.fillEventData(ctx, ev)
 		if err != nil {
+			log.WithError(err).WithField("proposalSlot", ev.ProposalSlot).Error("DEBUG-SSE: fillEventData returned error")
 			d.err = errors.Wrap(err, "Could not fill event data")
 			return
 		}
+		log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: fillEventData succeeded, marshaling attributes")
 		d.version = version.String(ev.HeadBlock.Version())
 		attributesBytes, err := marshalAttributes(ev.Attributer)
 		if err != nil {
+			log.WithError(err).Error("DEBUG-SSE: marshalAttributes failed")
 			d.err = errors.Wrap(err, "errors marshaling payload attributes to json")
 			return
 		}
@@ -884,20 +914,24 @@ func (s *Server) payloadAttributesReader(ctx context.Context, ev payloadattribut
 			PayloadAttributes: attributesBytes,
 		})
 		if d.err != nil {
+			log.WithError(d.err).Error("DEBUG-SSE: final marshal failed")
 			d.err = errors.Wrap(d.err, "errors marshaling payload attributes event data to json")
+		} else {
+			log.WithField("proposalSlot", ev.ProposalSlot).Info("DEBUG-SSE: payloadAttributesReader goroutine done, data ready")
 		}
 	}()
 	return func() io.Reader {
 		defer cancel()
 		select {
 		case <-ctx.Done():
-			log.WithError(ctx.Err()).Warn("Context canceled while waiting for payload attributes event data")
+			log.WithError(ctx.Err()).Warn("DEBUG-SSE: payloadAttributesReader lazyReader context canceled")
 			return nil
 		case ed := <-edc:
 			if ed.err != nil {
-				log.WithError(ed.err).Warn("Error while marshaling payload attributes event data")
+				log.WithError(ed.err).Warn("DEBUG-SSE: payloadAttributesReader lazyReader got error from goroutine")
 				return nil
 			}
+			log.Info("DEBUG-SSE: payloadAttributesReader lazyReader writing event to client")
 			return jsonMarshalReader(PayloadAttributesTopic, &structs.PayloadAttributesEvent{
 				Version: ed.version,
 				Data:    ed.data,
