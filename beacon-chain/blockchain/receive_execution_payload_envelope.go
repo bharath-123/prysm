@@ -367,7 +367,24 @@ func (s *Service) notifyForkchoiceUpdateGloas(
 	if err == nil {
 		hasAttr := attributes != nil && !attributes.IsEmpty()
 		if hasAttr && payloadID != nil && headBlock != nil && !headBlock.IsNil() && shouldFireEvent {
-			log.WithField("callerMethod", callerMethod).Info("DEBUG-FIRING: Firing payload attributes SSE event")
+			withdrawals, err := attributes.Withdrawals()
+			if err != nil {
+				log.WithError(err).Warn("Could not get withdrawals from payload attributes")
+			} else {
+				for i, w := range withdrawals {
+					log.WithFields(logrus.Fields{
+						"index":          w.Index,
+						"validatorIndex": w.ValidatorIndex,
+						"address":        fmt.Sprintf("%#x", w.Address),
+						"amount":         w.Amount,
+						"withdrawalNum":  i,
+					}).Info("DEBUG-SSE: Payload attributes withdrawal")
+				}
+				log.WithFields(logrus.Fields{
+					"callerMethod": callerMethod,
+					"withdrawals":  len(withdrawals),
+				}).Info("DEBUG-SSE: Firing payload attributes SSE event")
+			}
 			go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, headRoot, nextSlot)
 		}
 		return payloadID, nil
