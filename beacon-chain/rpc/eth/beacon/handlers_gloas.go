@@ -77,6 +77,14 @@ func (s *Server) PublishExecutionPayloadBid(w http.ResponseWriter, r *http.Reque
 		httputil.HandleError(w, "could not broadcast signed execution payload bid: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Inject bid into the local highest-bid cache directly.
+	// P2P broadcast does not loop back to the same node's gossip subscriber,
+	// so without this the proposer on this node would never see locally submitted bids.
+	if s.HighestBidCache != nil {
+		s.HighestBidCache.SetIfHigher(signedBid)
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 

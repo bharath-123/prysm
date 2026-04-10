@@ -25,32 +25,33 @@ import (
 // Server defines a server implementation of the gRPC Beacon Chain service,
 // providing RPC endpoints to access data relevant to the Ethereum Beacon Chain.
 type Server struct {
-	BeaconDB                db.ReadOnlyDatabase
-	ChainInfoFetcher        blockchain.ChainInfoFetcher
-	GenesisTimeFetcher      blockchain.TimeFetcher
-	BlockReceiver           blockchain.BlockReceiver
-	BlockNotifier           blockfeed.Notifier
-	OperationNotifier       operation.Notifier
-	Broadcaster             p2p.Broadcaster
-	AttestationCache        *cache.AttestationCache
-	AttestationsPool        attestations.Pool
-	SlashingsPool           slashings.PoolManager
-	VoluntaryExitsPool      voluntaryexits.PoolManager
-	StateGenService         stategen.StateManager
-	Stater                  lookup.Stater
-	Blocker                 lookup.Blocker
-	HeadFetcher             blockchain.HeadFetcher
-	TimeFetcher             blockchain.TimeFetcher
-	OptimisticModeFetcher   blockchain.OptimisticModeFetcher
-	V1Alpha1ValidatorServer eth.BeaconNodeValidatorServer
-	SyncChecker             sync.Checker
-	CanonicalHistory        *stategen.CanonicalHistory
-	ExecutionReconstructor  execution.Reconstructor
-	FinalizationFetcher     blockchain.FinalizationFetcher
+	BeaconDB                         db.ReadOnlyDatabase
+	ChainInfoFetcher                 blockchain.ChainInfoFetcher
+	GenesisTimeFetcher               blockchain.TimeFetcher
+	BlockReceiver                    blockchain.BlockReceiver
+	BlockNotifier                    blockfeed.Notifier
+	OperationNotifier                operation.Notifier
+	Broadcaster                      p2p.Broadcaster
+	AttestationCache                 *cache.AttestationCache
+	AttestationsPool                 attestations.Pool
+	SlashingsPool                    slashings.PoolManager
+	VoluntaryExitsPool               voluntaryexits.PoolManager
+	StateGenService                  stategen.StateManager
+	Stater                           lookup.Stater
+	Blocker                          lookup.Blocker
+	HeadFetcher                      blockchain.HeadFetcher
+	TimeFetcher                      blockchain.TimeFetcher
+	OptimisticModeFetcher            blockchain.OptimisticModeFetcher
+	V1Alpha1ValidatorServer          eth.BeaconNodeValidatorServer
+	SyncChecker                      sync.Checker
+	CanonicalHistory                 *stategen.CanonicalHistory
+	ExecutionReconstructor           execution.Reconstructor
+	FinalizationFetcher              blockchain.FinalizationFetcher
 	DataColumnReceiver               blockchain.DataColumnReceiver
 	ExecutionPayloadEnvelopeReceiver blockchain.ExecutionPayloadEnvelopeReceiver
 	BLSChangesPool                   blstoexec.PoolManager
 	ForkchoiceFetcher                blockchain.ForkchoiceFetcher
 	CoreService                      *core.Service
 	AttestationStateFetcher          blockchain.AttestationStateFetcher
+	HighestBidCache                  *cache.HighestExecutionPayloadBidCache
 }
