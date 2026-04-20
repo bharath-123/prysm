@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"fmt"
+	stdtime "time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/signing"
@@ -31,7 +32,10 @@ func ProcessAttestationsNoVerifySignature(
 	if b == nil || b.IsNil() {
 		return nil, blocks.ErrNilBeaconBlock
 	}
-	defer specmetrics.Observe("process_attestations", beaconState.Version())()
+	start := stdtime.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_attestations", version.String(beaconState.Version())).Observe(stdtime.Since(start).Seconds())
+	}()
 	body := b.Body()
 	var err error
 	for idx, att := range body.Attestations() {

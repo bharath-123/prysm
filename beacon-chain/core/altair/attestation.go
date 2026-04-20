@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	stdtime "time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/blocks"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/gloas"
@@ -18,6 +19,7 @@ import (
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1/attestation"
 	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
 
@@ -31,7 +33,10 @@ func ProcessAttestationsNoVerifySignature(
 	if b == nil || b.IsNil() {
 		return nil, consensusblocks.ErrNilBeaconBlock
 	}
-	defer specmetrics.Observe("process_attestations", beaconState.Version())()
+	start := stdtime.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_attestations", version.String(beaconState.Version())).Observe(stdtime.Since(start).Seconds())
+	}()
 	body := b.Body()
 	totalBalance, err := helpers.TotalActiveBalance(beaconState)
 	if err != nil {

@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/gloas"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
@@ -53,7 +54,10 @@ func ProcessVoluntaryExits(
 	exits []*ethpb.SignedVoluntaryExit,
 	exitInfo *v.ExitInfo,
 ) (state.BeaconState, error) {
-	defer specmetrics.Observe("process_voluntary_exits", beaconState.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_voluntary_exits", version.String(beaconState.Version())).Observe(time.Since(start).Seconds())
+	}()
 	// Avoid calculating the epoch churn if no exits exist.
 	if len(exits) == 0 {
 		return beaconState, nil

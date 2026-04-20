@@ -2,6 +2,7 @@ package altair
 
 import (
 	"context"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
@@ -37,7 +38,10 @@ func ProcessDeposits(
 	beaconState state.BeaconState,
 	deposits []*ethpb.Deposit,
 ) (state.BeaconState, error) {
-	defer specmetrics.Observe("process_deposits", beaconState.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_deposits", version.String(beaconState.Version())).Observe(time.Since(start).Seconds())
+	}()
 	allSignaturesVerified, err := helpers.BatchVerifyDepositsSignatures(ctx, deposits)
 	if err != nil {
 		return nil, err

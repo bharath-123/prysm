@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"fmt"
+	stdtime "time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/gloas"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
@@ -54,7 +55,10 @@ func ProcessProposerSlashings(
 	slashings []*ethpb.ProposerSlashing,
 	exitInfo *validators.ExitInfo,
 ) (state.BeaconState, error) {
-	defer specmetrics.Observe("process_proposer_slashings", beaconState.Version())()
+	start := stdtime.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_proposer_slashings", version.String(beaconState.Version())).Observe(stdtime.Since(start).Seconds())
+	}()
 	if exitInfo == nil && len(slashings) > 0 {
 		return nil, errors.New("exit info required to process proposer slashings")
 	}

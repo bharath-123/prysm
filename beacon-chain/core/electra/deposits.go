@@ -2,6 +2,7 @@ package electra
 
 import (
 	"context"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/signing"
@@ -34,7 +35,10 @@ func ProcessDeposits(
 ) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "electra.ProcessDeposits")
 	defer span.End()
-	defer specmetrics.Observe("process_deposits", beaconState.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_deposits", version.String(beaconState.Version())).Observe(time.Since(start).Seconds())
+	}()
 	// Attempt to verify all deposit signatures at once, if this fails then fall back to processing
 	// individual deposits with signature verification enabled.
 	allSignaturesVerified, err := helpers.BatchVerifyDepositsSignatures(ctx, deposits)

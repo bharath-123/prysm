@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/altair"
 	b "github.com/OffchainLabs/prysm/v7/beacon-chain/core/blocks"
@@ -276,7 +277,10 @@ func ProcessBlockNoVerifyAnySig(
 	if err := blocks.BeaconBlockIsNil(signed); err != nil {
 		return set, nil, err
 	}
-	defer specmetrics.Observe("process_block", st.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_block", version.String(st.Version())).Observe(time.Since(start).Seconds())
+	}()
 
 	if st.Version() != signed.Block().Version() {
 		return set, nil, fmt.Errorf("state and block are different version. %d != %d", st.Version(), signed.Block().Version())
@@ -356,7 +360,10 @@ func ProcessOperationsNoVerifyAttsSigs(
 	if beaconBlock == nil || beaconBlock.IsNil() {
 		return nil, blocks.ErrNilBeaconBlock
 	}
-	defer specmetrics.Observe("process_operations", state.Version())()
+	opsStart := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_operations", version.String(state.Version())).Observe(time.Since(opsStart).Seconds())
+	}()
 
 	if _, err := VerifyOperationLengths(ctx, state, beaconBlock); err != nil {
 		return nil, errors.Wrap(err, "could not verify operation lengths")

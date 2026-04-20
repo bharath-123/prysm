@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
@@ -17,6 +18,7 @@ import (
 	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
 	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/pkg/errors"
@@ -108,7 +110,10 @@ func ProcessConsolidationRequests(ctx context.Context, st state.BeaconState, req
 	if len(reqs) == 0 || st == nil {
 		return nil
 	}
-	defer specmetrics.Observe("process_consolidation_requests", st.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_consolidation_requests", version.String(st.Version())).Observe(time.Since(start).Seconds())
+	}()
 	curEpoch := slots.ToEpoch(st.Slot())
 	ffe := params.BeaconConfig().FarFutureEpoch
 	minValWithdrawDelay := params.BeaconConfig().MinValidatorWithdrawabilityDelay

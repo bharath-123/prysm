@@ -2,6 +2,7 @@ package transition
 
 import (
 	"context"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/blocks"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/electra"
@@ -160,7 +161,10 @@ func processEpochGloas(ctx context.Context, state state.BeaconState) error {
 	if state == nil || state.IsNil() {
 		return errors.New("nil state")
 	}
-	defer specmetrics.Observe("process_epoch", state.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_epoch", version.String(state.Version())).Observe(time.Since(start).Seconds())
+	}()
 	vp, bp, err := electra.InitializePrecomputeValidators(ctx, state)
 	if err != nil {
 		return err

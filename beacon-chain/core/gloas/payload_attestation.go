@@ -7,6 +7,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/signing"
@@ -22,6 +23,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
 )
@@ -45,7 +47,10 @@ var ErrValidatorNotInPTC = stderrors.New("validator not in PTC")
 //	    assert is_valid_indexed_payload_attestation(state, indexed_payload_attestation)
 //	</spec>
 func ProcessPayloadAttestations(ctx context.Context, st state.BeaconState, body interfaces.ReadOnlyBeaconBlockBody) error {
-	defer specmetrics.Observe("process_payload_attestations", st.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_payload_attestations", version.String(st.Version())).Observe(time.Since(start).Seconds())
+	}()
 	atts, err := body.PayloadAttestations()
 	if err != nil {
 		return errors.Wrap(err, "failed to get payload attestations from block body")

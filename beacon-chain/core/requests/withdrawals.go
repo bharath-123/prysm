@@ -3,6 +3,7 @@ package requests
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/validators"
@@ -91,7 +92,10 @@ import (
 func ProcessWithdrawalRequests(ctx context.Context, st state.BeaconState, wrs []*enginev1.WithdrawalRequest) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "requests.ProcessWithdrawalRequests")
 	defer span.End()
-	defer specmetrics.Observe("process_withdrawal_requests", st.Version())()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_withdrawal_requests", version.String(st.Version())).Observe(time.Since(start).Seconds())
+	}()
 	currentEpoch := slots.ToEpoch(st.Slot())
 	if len(wrs) == 0 {
 		return st, nil
