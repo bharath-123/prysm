@@ -2,11 +2,14 @@ package altair
 
 import (
 	"context"
+	"time"
 
 	e "github.com/OffchainLabs/prysm/v7/beacon-chain/core/epoch"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/epoch/precompute"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
 
@@ -35,6 +38,10 @@ func ProcessEpoch(ctx context.Context, state state.BeaconState) error {
 	if state == nil || state.IsNil() {
 		return errors.New("nil state")
 	}
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_epoch", version.String(state.Version())).Observe(time.Since(start).Seconds())
+	}()
 	vp, bp, err := InitializePrecomputeValidators(ctx, state)
 	if err != nil {
 		return err

@@ -3,6 +3,7 @@ package electra
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/altair"
 	e "github.com/OffchainLabs/prysm/v7/beacon-chain/core/epoch"
@@ -12,6 +13,8 @@ import (
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
 
@@ -58,6 +61,10 @@ func ProcessEpoch(ctx context.Context, state state.BeaconState) error {
 	if state == nil || state.IsNil() {
 		return errors.New("nil state")
 	}
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_epoch", version.String(state.Version())).Observe(time.Since(start).Seconds())
+	}()
 	vp, bp, err := InitializePrecomputeValidators(ctx, state)
 	if err != nil {
 		return err

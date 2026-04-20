@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	stdtime "time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/altair"
@@ -27,6 +28,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing"
 	prysmTrace "github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
@@ -69,6 +71,10 @@ func ExecuteStateTransition(
 
 	ctx, span := prysmTrace.StartSpan(ctx, "core.state.ExecuteStateTransition")
 	defer span.End()
+	start := stdtime.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("state_transition", version.String(state.Version())).Observe(stdtime.Since(start).Seconds())
+	}()
 	var err error
 
 	set, postState, err := ExecuteStateTransitionNoVerifyAnySig(ctx, state, signed)
@@ -209,6 +215,10 @@ func ProcessSlots(ctx context.Context, state state.BeaconState, slot primitives.
 	if state == nil || state.IsNil() {
 		return nil, errors.New("nil state")
 	}
+	slotsStart := stdtime.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_slots", version.String(state.Version())).Observe(stdtime.Since(slotsStart).Seconds())
+	}()
 	span.SetAttributes(prysmTrace.Int64Attribute("slots", int64(slot)-int64(state.Slot()))) // lint:ignore uintcast -- This is OK for tracing.
 
 	// The block must have a higher slot than parent state.
@@ -516,6 +526,10 @@ func ProcessEpochPrecompute(ctx context.Context, state state.BeaconState) (state
 	if state == nil || state.IsNil() {
 		return nil, errors.New("nil state")
 	}
+	epochStart := stdtime.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_epoch", version.String(state.Version())).Observe(stdtime.Since(epochStart).Seconds())
+	}()
 	vp, bp, err := precompute.New(ctx, state)
 	if err != nil {
 		return nil, err

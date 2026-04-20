@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/validators"
@@ -12,6 +13,8 @@ import (
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1/attestation"
 	"github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1/slashings"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
 )
@@ -42,6 +45,10 @@ func ProcessAttesterSlashings(
 	slashings []ethpb.AttSlashing,
 	exitInfo *validators.ExitInfo,
 ) (state.BeaconState, error) {
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_attester_slashings", version.String(beaconState.Version())).Observe(time.Since(start).Seconds())
+	}()
 	if exitInfo == nil && len(slashings) > 0 {
 		return nil, errors.New("exit info required to process attester slashings")
 	}

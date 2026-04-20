@@ -2,6 +2,7 @@ package requests
 
 import (
 	"context"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/config/params"
@@ -9,6 +10,8 @@ import (
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
 
@@ -16,6 +19,10 @@ import (
 func ProcessDepositRequests(ctx context.Context, beaconState state.BeaconState, reqs []*enginev1.DepositRequest) (state.BeaconState, error) {
 	_, span := trace.StartSpan(ctx, "requests.ProcessDepositRequests")
 	defer span.End()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_deposit_requests", version.String(beaconState.Version())).Observe(time.Since(start).Seconds())
+	}()
 
 	if len(reqs) == 0 {
 		return beaconState, nil

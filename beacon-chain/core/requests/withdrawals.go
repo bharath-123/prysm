@@ -3,6 +3,7 @@ package requests
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/validators"
@@ -13,6 +14,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -90,6 +92,10 @@ import (
 func ProcessWithdrawalRequests(ctx context.Context, st state.BeaconState, wrs []*enginev1.WithdrawalRequest) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "requests.ProcessWithdrawalRequests")
 	defer span.End()
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_withdrawal_requests", version.String(st.Version())).Observe(time.Since(start).Seconds())
+	}()
 	currentEpoch := slots.ToEpoch(st.Slot())
 	if len(wrs) == 0 {
 		return st, nil

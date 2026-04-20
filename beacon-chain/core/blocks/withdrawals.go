@@ -3,6 +3,7 @@ package blocks
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/signing"
@@ -16,6 +17,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	"github.com/OffchainLabs/prysm/v7/encoding/ssz"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
@@ -32,6 +34,10 @@ func ProcessBLSToExecutionChanges(
 	if b.Version() < version.Capella {
 		return st, nil
 	}
+	start := time.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_bls_to_execution_changes", version.String(st.Version())).Observe(time.Since(start).Seconds())
+	}()
 	changes, err := b.Body().BLSToExecutionChanges()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get BLSToExecutionChanges")

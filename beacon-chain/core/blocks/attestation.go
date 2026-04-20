@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"fmt"
+	stdtime "time"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/signing"
@@ -16,6 +17,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1/attestation"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
@@ -30,6 +32,10 @@ func ProcessAttestationsNoVerifySignature(
 	if b == nil || b.IsNil() {
 		return nil, blocks.ErrNilBeaconBlock
 	}
+	start := stdtime.Now()
+	defer func() {
+		specmetrics.SpecFunctionDuration.WithLabelValues("process_attestations", version.String(beaconState.Version())).Observe(stdtime.Since(start).Seconds())
+	}()
 	body := b.Body()
 	var err error
 	for idx, att := range body.Attestations() {
