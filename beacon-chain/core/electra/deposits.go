@@ -13,6 +13,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
@@ -33,6 +34,7 @@ func ProcessDeposits(
 ) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "electra.ProcessDeposits")
 	defer span.End()
+	defer specmetrics.Observe("process_deposits", beaconState.Version())()
 	// Attempt to verify all deposit signatures at once, if this fails then fall back to processing
 	// individual deposits with signature verification enabled.
 	allSignaturesVerified, err := helpers.BatchVerifyDepositsSignatures(ctx, deposits)

@@ -27,6 +27,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing"
 	prysmTrace "github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
@@ -69,6 +70,7 @@ func ExecuteStateTransition(
 
 	ctx, span := prysmTrace.StartSpan(ctx, "core.state.ExecuteStateTransition")
 	defer span.End()
+	defer specmetrics.Observe("state_transition", state.Version())()
 	var err error
 
 	set, postState, err := ExecuteStateTransitionNoVerifyAnySig(ctx, state, signed)
@@ -209,6 +211,7 @@ func ProcessSlots(ctx context.Context, state state.BeaconState, slot primitives.
 	if state == nil || state.IsNil() {
 		return nil, errors.New("nil state")
 	}
+	defer specmetrics.Observe("process_slots", state.Version())()
 	span.SetAttributes(prysmTrace.Int64Attribute("slots", int64(slot)-int64(state.Slot()))) // lint:ignore uintcast -- This is OK for tracing.
 
 	// The block must have a higher slot than parent state.
@@ -324,6 +327,7 @@ func ProcessSlotsCore(ctx context.Context, span trace.Span, state state.BeaconSt
 
 // ProcessEpoch is a wrapper on fork specific epoch processing
 func ProcessEpoch(ctx context.Context, state state.BeaconState) (state.BeaconState, error) {
+	defer specmetrics.Observe("process_epoch", state.Version())()
 	var err error
 	if time.CanProcessEpoch(state) {
 		if state.Version() >= version.Gloas {

@@ -9,6 +9,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/pkg/errors"
 )
 
@@ -16,6 +17,7 @@ import (
 func ProcessDepositRequests(ctx context.Context, beaconState state.BeaconState, reqs []*enginev1.DepositRequest) (state.BeaconState, error) {
 	_, span := trace.StartSpan(ctx, "requests.ProcessDepositRequests")
 	defer span.End()
+	defer specmetrics.Observe("process_deposit_requests", beaconState.Version())()
 
 	if len(reqs) == 0 {
 		return beaconState, nil

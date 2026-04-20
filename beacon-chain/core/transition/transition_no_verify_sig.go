@@ -18,6 +18,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/crypto/bls"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
@@ -275,6 +276,7 @@ func ProcessBlockNoVerifyAnySig(
 	if err := blocks.BeaconBlockIsNil(signed); err != nil {
 		return set, nil, err
 	}
+	defer specmetrics.Observe("process_block", st.Version())()
 
 	if st.Version() != signed.Block().Version() {
 		return set, nil, fmt.Errorf("state and block are different version. %d != %d", st.Version(), signed.Block().Version())
@@ -354,6 +356,7 @@ func ProcessOperationsNoVerifyAttsSigs(
 	if beaconBlock == nil || beaconBlock.IsNil() {
 		return nil, blocks.ErrNilBeaconBlock
 	}
+	defer specmetrics.Observe("process_operations", state.Version())()
 
 	if _, err := VerifyOperationLengths(ctx, state, beaconBlock); err != nil {
 		return nil, errors.Wrap(err, "could not verify operation lengths")
