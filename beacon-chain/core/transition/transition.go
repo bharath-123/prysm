@@ -327,7 +327,6 @@ func ProcessSlotsCore(ctx context.Context, span trace.Span, state state.BeaconSt
 
 // ProcessEpoch is a wrapper on fork specific epoch processing
 func ProcessEpoch(ctx context.Context, state state.BeaconState) (state.BeaconState, error) {
-	defer specmetrics.Observe("process_epoch", state.Version())()
 	var err error
 	if time.CanProcessEpoch(state) {
 		if state.Version() >= version.Gloas {
@@ -520,6 +519,7 @@ func ProcessEpochPrecompute(ctx context.Context, state state.BeaconState) (state
 	if state == nil || state.IsNil() {
 		return nil, errors.New("nil state")
 	}
+	defer specmetrics.Observe("process_epoch", state.Version())()
 	vp, bp, err := precompute.New(ctx, state)
 	if err != nil {
 		return nil, err

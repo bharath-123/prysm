@@ -14,6 +14,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
+	"github.com/OffchainLabs/prysm/v7/runtime/specmetrics"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/pkg/errors"
 )
@@ -159,6 +160,7 @@ func processEpochGloas(ctx context.Context, state state.BeaconState) error {
 	if state == nil || state.IsNil() {
 		return errors.New("nil state")
 	}
+	defer specmetrics.Observe("process_epoch", state.Version())()
 	vp, bp, err := electra.InitializePrecomputeValidators(ctx, state)
 	if err != nil {
 		return err
