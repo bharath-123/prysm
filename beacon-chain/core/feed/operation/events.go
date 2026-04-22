@@ -49,6 +49,10 @@ const (
 
 	// PayloadAttestationMessageReceived is sent after a payload attestation message is received from gossip or rpc.
 	PayloadAttestationMessageReceived = 13
+
+	// SignedProposerPreferencesReceived is sent after a signed proposer preferences message
+	// passes gossip validation or is submitted via the API.
+	SignedProposerPreferencesReceived = 14
 )
 
 // UnAggregatedAttReceivedData is the data sent with UnaggregatedAttReceived events.
@@ -121,4 +125,9 @@ type DataColumnReceivedData struct {
 // PayloadAttestationMessageReceivedData is the data sent with PayloadAttestationMessageReceived events.
 type PayloadAttestationMessageReceivedData struct {
 	Message *ethpb.PayloadAttestationMessage
+}
+
+// SignedProposerPreferencesReceivedData is the data sent with SignedProposerPreferencesReceived events.
+type SignedProposerPreferencesReceivedData struct {
+	Preferences *ethpb.SignedProposerPreferences
 }

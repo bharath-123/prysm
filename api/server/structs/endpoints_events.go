@@ -117,3 +117,21 @@ type PayloadEvent struct {
 	Slot      string `json:"slot"`
 	BlockRoot string `json:"block_root"`
 }
+
+type ProposerPreferencesMessage struct {
+	ProposalSlot   string `json:"proposal_slot"`
+	ValidatorIndex string `json:"validator_index"`
+	FeeRecipient   string `json:"fee_recipient"`
+	GasLimit       string `json:"gas_limit"`
+}
+
+type SignedProposerPreferencesData struct {
+	Message   *ProposerPreferencesMessage `json:"message"`
+	Signature string                      `json:"signature"`
+}
+
+type ProposerPreferencesEvent struct {
+	Version string                         `json:"version"`
+	Data    *SignedProposerPreferencesData `json:"data"`
+}
+

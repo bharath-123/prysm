@@ -3,6 +3,8 @@ package sync
 import (
 	"context"
 
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/operation"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/transition"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/verification"
@@ -82,6 +84,10 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 	}
 
 	s.proposerPreferencesCache.Add(slot, signedPreferences.Message.FeeRecipient, signedPreferences.Message.GasLimit)
+	s.cfg.operationNotifier.OperationFeed().Send(&feed.Event{
+		Type: operation.SignedProposerPreferencesReceived,
+		Data: &operation.SignedProposerPreferencesReceivedData{Preferences: signedPreferences},
+	})
 	msg.ValidatorData = signedPreferences
 	return pubsub.ValidationAccept, nil
 }

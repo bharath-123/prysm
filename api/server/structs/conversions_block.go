@@ -12,6 +12,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
 	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -3417,4 +3418,20 @@ func (e *SignedExecutionPayloadEnvelope) ToConsensus() (*eth.SignedExecutionPayl
 		Message:   msg,
 		Signature: sig,
 	}, nil
+}
+
+func SignedProposerPreferencesEventFromConsensus(p *eth.SignedProposerPreferences) *ProposerPreferencesEvent {
+	msg := p.GetMessage()
+	return &ProposerPreferencesEvent{
+		Version: version.String(version.Gloas),
+		Data: &SignedProposerPreferencesData{
+			Message: &ProposerPreferencesMessage{
+				ProposalSlot:   fmt.Sprintf("%d", msg.GetProposalSlot()),
+				ValidatorIndex: fmt.Sprintf("%d", msg.GetValidatorIndex()),
+				FeeRecipient:   hexutil.Encode(msg.GetFeeRecipient()),
+				GasLimit:       fmt.Sprintf("%d", msg.GetGasLimit()),
+			},
+			Signature: hexutil.Encode(p.GetSignature()),
+		},
+	}
 }
