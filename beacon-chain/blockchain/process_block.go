@@ -1159,6 +1159,15 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 		return
 	}
 
+	s.headLock.RLock()
+	headBlock, err := s.headBlock()
+	if err != nil {
+		s.headLock.RUnlock()
+		log.WithError(err).Debug("could not perform late block tasks: failed to retrieve head block")
+		return
+	}
+	s.headLock.RUnlock()
+
 	if headState.Version() >= version.Gloas {
 		bid, err := headState.LatestExecutionPayloadBid()
 		if err != nil {
@@ -1169,7 +1178,7 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 		if s.HasFullNode(headRoot) {
 			bh = bid.BlockHash()
 		}
-		id, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attribute)
+		id, err := s.notifyForkchoiceUpdateGloas(ctx, headBlock, bh, s.CurrentSlot()+1, attribute)
 		if err != nil {
 			log.WithError(err).Debug("could not perform late block tasks: failed to update forkchoice with engine")
 		}
@@ -1178,14 +1187,6 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 		}
 		return
 	}
-	s.headLock.RLock()
-	headBlock, err := s.headBlock()
-	if err != nil {
-		s.headLock.RUnlock()
-		log.WithError(err).Debug("could not perform late block tasks: failed to retrieve head block")
-		return
-	}
-	s.headLock.RUnlock()
 
 	fcuArgs := &fcuConfig{
 		headState:  headState,

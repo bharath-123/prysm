@@ -153,10 +153,15 @@ func (s *Service) postPayloadTasks(ctx context.Context, envelope interfaces.ROEx
 	}
 	s.headLock.Unlock()
 
+	headBlock, err := s.headBlock()
+	if err != nil {
+		return errors.Wrap(err, "could not get head block")
+	}
+
 	attr := s.getPayloadAttribute(ctx, st, envelope.Slot()+1, headRoot[:], true)
 	if s.inRegularSync() {
 		go func() {
-			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, blockHash, attr)
+			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, blockHash, envelope.Slot()+1, attr)
 			if err != nil {
 				log.WithError(err).Error("Could not notify forkchoice update")
 				return
@@ -290,7 +295,8 @@ func (s *Service) savePostPayload(ctx context.Context, signed interfaces.ROSigne
 
 // notifyForkchoiceUpdateGloas takes the block hash directly because Gloas
 // blocks don't carry an execution payload in the body.
-func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32]byte, attributes payloadattribute.Attributer) (*enginev1.PayloadIDBytes, error) {
+// TODO - pass in the beacon block and the next slot
+func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, headBlock interfaces.ReadOnlySignedBeaconBlock, blockHash [32]byte, slot primitives.Slot, attributes payloadattribute.Attributer) (*enginev1.PayloadIDBytes, error) {
 	ctx, span := trace.StartSpan(ctx, "blockChain.notifyForkchoiceUpdateGloas")
 	defer span.End()
 
@@ -309,6 +315,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 
 	payloadID, lastValidHash, err := s.cfg.ExecutionEngineCaller.ForkchoiceUpdated(ctx, fcs, attributes)
 	if err == nil {
+		go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, blockHash, slot)
 		return payloadID, nil
 	}
 
@@ -318,6 +325,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 			"headBlockHash":             fmt.Sprintf("%#x", bytesutil.Trunc(blockHash[:])),
 			"finalizedPayloadBlockHash": fmt.Sprintf("%#x", bytesutil.Trunc(finalizedHash[:])),
 		}).Info("Called forkchoice updated with optimistic block (Gloas)")
+		go s.firePayloadAttributesEvent(s.cfg.StateNotifier.StateFeed(), headBlock, blockHash, slot)
 		return payloadID, nil
 	case errors.Is(err, execution.ErrInvalidPayloadStatus):
 		if len(lastValidHash) == 0 {

@@ -336,7 +336,12 @@ func TestNotifyForkchoiceUpdateGloas_Valid(t *testing.T) {
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
 	attr := payloadattribute.EmptyWithVersion(version.Gloas)
 
-	retPid, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, attr)
+	headBlock, err := s.headBlock()
+	if err != nil {
+		t.Fatalf("Could not get head block: %v", err)
+	}
+
+	retPid, err := s.notifyForkchoiceUpdateGloas(ctx, headBlock, blockHash, 1, attr)
 	require.NoError(t, err)
 	require.DeepEqual(t, pid, retPid)
 }
@@ -348,7 +353,11 @@ func TestNotifyForkchoiceUpdateGloas_Syncing(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, nil)
+	headBlock, err := s.headBlock()
+	if err != nil {
+		t.Fatalf("Could not get head block: %v", err)
+	}
+	_, err = s.notifyForkchoiceUpdateGloas(ctx, headBlock, blockHash, 1, nil)
 	require.NoError(t, err)
 }
 
@@ -359,7 +368,11 @@ func TestNotifyForkchoiceUpdateGloas_Invalid(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, nil)
+	headBlock, err := s.headBlock()
+	if err != nil {
+		t.Fatalf("Could not get head block: %v", err)
+	}
+	_, err = s.notifyForkchoiceUpdateGloas(ctx, headBlock, blockHash, 1, nil)
 	require.Equal(t, true, IsInvalidBlock(err))
 }
 
@@ -368,7 +381,11 @@ func TestNotifyForkchoiceUpdateGloas_NilAttributes(t *testing.T) {
 	ctx := t.Context()
 
 	blockHash := bytesutil.ToBytes32([]byte("hash1"))
-	_, err := s.notifyForkchoiceUpdateGloas(ctx, blockHash, nil)
+	headBlock, err := s.headBlock()
+	if err != nil {
+		t.Fatalf("Could not get head block: %v", err)
+	}
+	_, err = s.notifyForkchoiceUpdateGloas(ctx, headBlock, blockHash, 1, nil)
 	require.NoError(t, err)
 }
 

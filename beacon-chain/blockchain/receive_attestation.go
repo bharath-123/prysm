@@ -160,7 +160,7 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 				log.WithError(hashErr).Error("Could not get block hash from forkchoice for FCU")
 			} else {
 				go func() {
-					pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, blockHash, attr)
+					pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, headBlock, blockHash, proposingSlot, attr)
 					if err != nil {
 						log.WithError(err).Error("Could not update forkchoice with engine")
 					}

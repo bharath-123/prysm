@@ -197,7 +197,14 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 		log.WithError(err).Error("Could not get latest block hash")
 		return
 	}
-	pid, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attr)
+
+	headBlock, err := s.headBlock()
+	if err != nil {
+		log.WithError(err).Error("Could not get head block")
+		return
+	}
+
+	pid, err := s.notifyForkchoiceUpdateGloas(ctx, headBlock, bh, currentSlot+1, attr)
 	if err != nil {
 		log.WithError(err).Error("Could not notify forkchoice update")
 		return
