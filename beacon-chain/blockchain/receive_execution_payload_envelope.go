@@ -344,7 +344,6 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 				"hasPayloadID":  payloadID != nil,
 				"emptyAttrs":    attributes.IsEmpty(),
 				"headBlockHash": fmt.Sprintf("%#x", bytesutil.Trunc(blockHash[:])),
-				"error":         err.Error(),
 			}).Error("BHARATH: Skipped payload_attributes SSE event: engine returned no payload ID")
 		}
 		return payloadID, nil
