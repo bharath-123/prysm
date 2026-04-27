@@ -1132,11 +1132,17 @@ func (s *Service) areBlobsAvailable(ctx context.Context, root [fieldparams.RootL
 // it also updates the next slot cache and the proposer index cache to deal with skipped slots.
 func (s *Service) lateBlockTasks(ctx context.Context) {
 	currentSlot := s.CurrentSlot()
+	log.WithFields(logrus.Fields{
+		"currentSlot": currentSlot,
+		"headSlot":    s.HeadSlot(),
+	}).Info("BHARATH: lateBlockTasks invoked")
 	if currentSlot == s.HeadSlot() {
+		log.Info("BHARATH: lateBlockTasks early return: currentSlot == headSlot (block is on time)")
 		return
 	}
 	// return early if we are in init sync
 	if !s.inRegularSync() {
+		log.Info("BHARATH: lateBlockTasks early return: not in regular sync")
 		return
 	}
 	s.headLock.RLock()

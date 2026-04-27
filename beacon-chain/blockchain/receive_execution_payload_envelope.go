@@ -35,6 +35,7 @@ type ExecutionPayloadEnvelopeReceiver interface {
 func (s *Service) ReceiveExecutionPayloadEnvelope(ctx context.Context, signed interfaces.ROSignedExecutionPayloadEnvelope) (err error) {
 	ctx, span := trace.StartSpan(ctx, "blockChain.ReceiveExecutionPayloadEnvelope")
 	defer span.End()
+	log.Info("BHARATH: ReceiveExecutionPayloadEnvelope invoked")
 	start := time.Now()
 	defer func() {
 		beaconExecutionPayloadEnvelopeProcessingDurationSeconds.Observe(time.Since(start).Seconds())
@@ -139,7 +140,14 @@ func (s *Service) ReceiveExecutionPayloadEnvelope(ctx context.Context, signed in
 }
 
 func (s *Service) postPayloadTasks(ctx context.Context, envelope interfaces.ROExecutionPayloadEnvelope, st state.BeaconState, root, headRoot [32]byte) error {
+	log.WithFields(logrus.Fields{
+		"envelopeSlot": envelope.Slot(),
+		"envelopeRoot": fmt.Sprintf("%#x", bytesutil.Trunc(root[:])),
+		"headRoot":     fmt.Sprintf("%#x", bytesutil.Trunc(headRoot[:])),
+		"headEqRoot":   headRoot == root,
+	}).Info("BHARATH: postPayloadTasks invoked")
 	if headRoot != root {
+		log.Info("BHARATH: postPayloadTasks early return: headRoot != root")
 		return nil
 	}
 	payload, err := envelope.Execution()
@@ -156,6 +164,11 @@ func (s *Service) postPayloadTasks(ctx context.Context, envelope interfaces.ROEx
 
 	proposalSlot := envelope.Slot() + 1
 	attr := s.getPayloadAttribute(ctx, st, proposalSlot, headRoot[:], true)
+	log.WithFields(logrus.Fields{
+		"proposalSlot":  proposalSlot,
+		"attrIsEmpty":   attr == nil || attr.IsEmpty(),
+		"inRegularSync": s.inRegularSync(),
+	}).Info("BHARATH: postPayloadTasks reached FCU dispatch")
 	if s.inRegularSync() {
 		var fcuEvent *gloasFCUEvent
 		if proposerIndex, idxErr := helpers.BeaconProposerIndexAtSlot(ctx, st, proposalSlot); idxErr == nil {

@@ -154,6 +154,11 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 			return
 		}
 		postGloas := slots.ToEpoch(proposingSlot) >= params.BeaconConfig().GloasForkEpoch
+		log.WithFields(logrus.Fields{
+			"proposingSlot": proposingSlot,
+			"newHeadRoot":   fmt.Sprintf("%#x", bytesutil.Trunc(newHeadRoot[:])),
+			"postGloas":     postGloas,
+		}).Info("BHARATH: UpdateHead reached FCU dispatch (head changed via attestations)")
 		if postGloas {
 			blockHash, hashErr := s.cfg.ForkChoiceStore.BlockHash(newHeadRoot)
 			if hashErr != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func (s *Service) waitUntilEpoch(target primitives.Epoch, secondsPerSlot uint64) error {
@@ -163,7 +164,12 @@ func (s *Service) getLatePayloadAttribute(ctx context.Context, st state.ReadOnly
 // The case where the block was also missing would have been dealt by lateBlockTasks already.
 func (s *Service) latePayloadTasks(ctx context.Context) {
 	currentSlot := s.CurrentSlot()
+	log.WithFields(logrus.Fields{
+		"currentSlot": currentSlot,
+		"headSlot":    s.HeadSlot(),
+	}).Info("BHARATH: latePayloadTasks invoked")
 	if currentSlot != s.HeadSlot() {
+		log.Info("BHARATH: latePayloadTasks early return: currentSlot != headSlot")
 		// We must've already sent a FCU and updated the caches in lateBlockTaks.
 		return
 	}
@@ -174,9 +180,11 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 	}
 	hr := [32]byte(r)
 	if s.payloadBeingSynced.isSyncing(hr) {
+		log.Info("BHARATH: latePayloadTasks early return: payload being synced")
 		return
 	}
 	if s.HasFullNode(hr) {
+		log.Info("BHARATH: latePayloadTasks early return: already have full node (envelope arrived)")
 		return
 	}
 	st, err := s.HeadStateReadOnly(ctx)
@@ -185,10 +193,12 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 		return
 	}
 	if !s.inRegularSync() {
+		log.Info("BHARATH: latePayloadTasks early return: not in regular sync")
 		return
 	}
 	attr := s.getLatePayloadAttribute(ctx, st, currentSlot+1, r)
 	if attr == nil || attr.IsEmpty() {
+		log.Info("BHARATH: latePayloadTasks early return: empty payload attribute")
 		return
 	}
 	beaconLatePayloadTaskTriggeredTotal.Inc()
