@@ -601,6 +601,8 @@ type ExecutionPayloadEnvelope struct {
 }
 
 type SignedExecutionPayloadEnvelope struct {
-	Message   *ExecutionPayloadEnvelope `json:"message"`
-	Signature string                    `json:"signature"`
+	Message    *ExecutionPayloadEnvelope `json:"message"`
+	Signature  string                    `json:"signature"`
+	Blobs      []string                  `json:"blobs,omitempty"`
+	CellProofs []string                  `json:"cell_proofs,omitempty"`
 }

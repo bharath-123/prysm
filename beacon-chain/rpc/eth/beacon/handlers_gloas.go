@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/network/httputil"
 	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -108,8 +110,19 @@ func (s *Server) PublishExecutionPayloadEnvelope(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if _, err := s.V1Alpha1ValidatorServer.PublishExecutionPayloadEnvelope(ctx, consensus); err != nil {
-		if st, ok := status.FromError(err); ok {
+	var publishErr error
+	if len(jsonEnvelope.Blobs) > 0 {
+		blobs, cellProofs, decErr := decodeBlobsAndCellProofs(jsonEnvelope.Blobs, jsonEnvelope.CellProofs)
+		if decErr != nil {
+			httputil.HandleError(w, decErr.Error(), http.StatusBadRequest)
+			return
+		}
+		_, publishErr = s.EnvelopePublisher.PublishExecutionPayloadEnvelopeWithBlobs(ctx, consensus, blobs, cellProofs)
+	} else {
+		_, publishErr = s.EnvelopePublisher.PublishExecutionPayloadEnvelope(ctx, consensus)
+	}
+	if publishErr != nil {
+		if st, ok := status.FromError(publishErr); ok {
 			switch st.Code() {
 			case codes.InvalidArgument:
 				httputil.HandleError(w, st.Message(), http.StatusBadRequest)
@@ -118,11 +131,31 @@ func (s *Server) PublishExecutionPayloadEnvelope(w http.ResponseWriter, r *http.
 			}
 			return
 		}
-		httputil.HandleError(w, "could not publish execution payload envelope: "+err.Error(), http.StatusInternalServerError)
+		httputil.HandleError(w, "could not publish execution payload envelope: "+publishErr.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func decodeBlobsAndCellProofs(rawBlobs, rawCellProofs []string) ([][]byte, [][]byte, error) {
+	blobs := make([][]byte, len(rawBlobs))
+	for i, s := range rawBlobs {
+		b, err := hexutil.Decode(s)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid blob at index %d: %w", i, err)
+		}
+		blobs[i] = b
+	}
+	cellProofs := make([][]byte, len(rawCellProofs))
+	for i, s := range rawCellProofs {
+		p, err := hexutil.Decode(s)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid cell proof at index %d: %w", i, err)
+		}
+		cellProofs[i] = p
+	}
+	return blobs, cellProofs, nil
 }
 
 // PublishSignedExecutionPayloadBid broadcasts a signed execution payload bid to the P2P network.

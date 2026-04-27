@@ -185,6 +185,42 @@ func (vs *Server) PublishExecutionPayloadEnvelope(
 	return &emptypb.Empty{}, nil
 }
 
+// PublishExecutionPayloadEnvelopeWithBlobs is like PublishExecutionPayloadEnvelope but also
+// accepts raw blobs and cell proofs submitted by an external builder via the HTTP API.
+// It computes the PeerDAS data-column sidecars from the provided blobs and cell proofs,
+// broadcasts them before the envelope, then delegates to PublishExecutionPayloadEnvelope.
+func (vs *Server) PublishExecutionPayloadEnvelopeWithBlobs(
+	ctx context.Context,
+	req *ethpb.SignedExecutionPayloadEnvelope,
+	blobs [][]byte,
+	cellProofs [][]byte,
+) (*emptypb.Empty, error) {
+	ctx, span := trace.StartSpan(ctx, "ProposerServer.PublishExecutionPayloadEnvelopeWithBlobs")
+	defer span.End()
+
+	if req == nil || req.Message == nil || req.Message.Payload == nil {
+		return nil, status.Error(codes.InvalidArgument, "signed envelope or payload cannot be nil")
+	}
+
+	cellsPerBlob, proofsPerBlob, err := peerdas.ComputeCellsAndProofsFromFlat(blobs, cellProofs)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "could not compute cells and proofs from blobs: %v", err)
+	}
+
+	slot := primitives.Slot(req.Message.Payload.SlotNumber)
+	blockRoot := bytesutil.ToBytes32(req.Message.BeaconBlockRoot)
+	roSidecars, err := peerdas.DataColumnSidecarsGloas(cellsPerBlob, proofsPerBlob, slot, blockRoot)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not build data column sidecars: %v", err)
+	}
+
+	if err := vs.broadcastAndReceiveDataColumns(ctx, roSidecars); err != nil {
+		log.WithError(err).Error("Failed to broadcast data column sidecars for externally submitted envelope")
+	}
+
+	return vs.PublishExecutionPayloadEnvelope(ctx, req)
+}
+
 // broadcastGloasDataColumns broadcasts pre-computed DataColumnSidecarGloas from the cache.
 // The sidecars are computed during storeExecutionPayloadEnvelope (inside ProposeBeaconBlock)
 // so no expensive KZG work happens here.

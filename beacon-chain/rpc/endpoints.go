@@ -560,6 +560,7 @@ func (s *Service) beaconEndpoints(
 		TimeFetcher:             s.cfg.GenesisTimeFetcher,
 		VoluntaryExitsPool:      s.cfg.ExitPool,
 		V1Alpha1ValidatorServer: validatorServer,
+		EnvelopePublisher:       validatorServer,
 		SyncChecker:             s.cfg.SyncService,
 		ExecutionReconstructor:  s.cfg.ExecutionReconstructor,
 		BLSChangesPool:          s.cfg.BLSChangesPool,

@@ -4,6 +4,8 @@
 package beacon
 
 import (
+	"context"
+
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
 	blockfeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/block"
@@ -20,7 +22,15 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state/stategen"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/sync"
 	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+// ExecutionPayloadEnvelopePublisher publishes signed execution payload envelopes,
+// with optional blob and cell-proof data for PeerDAS sidecar broadcasting.
+type ExecutionPayloadEnvelopePublisher interface {
+	PublishExecutionPayloadEnvelope(ctx context.Context, req *eth.SignedExecutionPayloadEnvelope) (*emptypb.Empty, error)
+	PublishExecutionPayloadEnvelopeWithBlobs(ctx context.Context, req *eth.SignedExecutionPayloadEnvelope, blobs [][]byte, cellProofs [][]byte) (*emptypb.Empty, error)
+}
 
 // Server defines a server implementation of the gRPC Beacon Chain service,
 // providing RPC endpoints to access data relevant to the Ethereum Beacon Chain.
@@ -43,6 +53,7 @@ type Server struct {
 	TimeFetcher             blockchain.TimeFetcher
 	OptimisticModeFetcher   blockchain.OptimisticModeFetcher
 	V1Alpha1ValidatorServer eth.BeaconNodeValidatorServer
+	EnvelopePublisher       ExecutionPayloadEnvelopePublisher
 	SyncChecker             sync.Checker
 	CanonicalHistory        *stategen.CanonicalHistory
 	ExecutionReconstructor  execution.Reconstructor
