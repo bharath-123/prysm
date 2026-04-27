@@ -316,6 +316,11 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 	ctx, span := trace.StartSpan(ctx, "blockChain.notifyForkchoiceUpdateGloas")
 	defer span.End()
 
+	log.WithFields(logrus.Fields{
+		"blockHash": fmt.Sprintf("%#x", blockHash[:]),
+		"attributes": attributes,
+		"ev":         ev,
+	}).Info("Notifying forkchoice update for Gloas")
 	s.cfg.ForkChoiceStore.RLock()
 	finalizedHash := s.cfg.ForkChoiceStore.FinalizedPayloadBlockHash()
 	justifiedHash := s.cfg.ForkChoiceStore.UnrealizedJustifiedPayloadBlockHash()
@@ -365,6 +370,13 @@ func (s *Service) fireGloasPayloadAttributesEvent(parentBlockHash [32]byte, attr
 	if !s.cfg.SyncChecker.Synced() {
 		return
 	}
+	log.WithFields(logrus.Fields{
+		"proposerIndex": ev.proposerIndex,
+		"proposalSlot":  ev.proposalSlot,
+		"parentBlockHash": fmt.Sprintf("%#x", parentBlockHash[:]),
+		"attributes":      attributes,
+		"headRoot":        fmt.Sprintf("%#x", ev.headRoot[:]),
+	}).Info("Firing payload_attributes event for Gloas")
 	s.cfg.StateNotifier.StateFeed().Send(&feed.Event{
 		Type: statefeed.PayloadAttributes,
 		Data: payloadattribute.EventData{
