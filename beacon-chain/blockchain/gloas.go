@@ -117,7 +117,7 @@ func (s *Service) getLatePayloadAttribute(ctx context.Context, st state.ReadOnly
 	if slot > st.Slot() {
 		writable, ok := st.(state.BeaconState)
 		if !ok {
-			log.Error("head state is not writable; cannot advance slots")
+			log.Error("Head state is not writable; cannot advance slots")
 			return emptyAttri
 		}
 		st, err = transition.ProcessSlotsUsingNextSlotCache(ctx, writable, headRoot, slot)
