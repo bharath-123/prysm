@@ -320,7 +320,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 		"blockHash": fmt.Sprintf("%#x", blockHash[:]),
 		"attributes": attributes,
 		"ev":         ev,
-	}).Info("Notifying forkchoice update for Gloas")
+	}).Info("BHARATH: Notifying forkchoice update for Gloas")
 	s.cfg.ForkChoiceStore.RLock()
 	finalizedHash := s.cfg.ForkChoiceStore.FinalizedPayloadBlockHash()
 	justifiedHash := s.cfg.ForkChoiceStore.UnrealizedJustifiedPayloadBlockHash()
@@ -376,7 +376,7 @@ func (s *Service) fireGloasPayloadAttributesEvent(parentBlockHash [32]byte, attr
 		"parentBlockHash": fmt.Sprintf("%#x", parentBlockHash[:]),
 		"attributes":      attributes,
 		"headRoot":        fmt.Sprintf("%#x", ev.headRoot[:]),
-	}).Info("Firing payload_attributes event for Gloas")
+	}).Info("BHARATH: Firing payload_attributes event for Gloas")
 	s.cfg.StateNotifier.StateFeed().Send(&feed.Event{
 		Type: statefeed.PayloadAttributes,
 		Data: payloadattribute.EventData{
