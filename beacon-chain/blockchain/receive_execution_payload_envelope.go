@@ -317,7 +317,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 	defer span.End()
 
 	log.WithFields(logrus.Fields{
-		"blockHash": fmt.Sprintf("%#x", blockHash[:]),
+		"blockHash":  fmt.Sprintf("%#x", blockHash[:]),
 		"attributes": attributes,
 		"ev":         ev,
 	}).Info("BHARATH: Notifying forkchoice update for Gloas")
@@ -338,6 +338,14 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 	if err == nil {
 		if ev != nil && payloadID != nil && !attributes.IsEmpty() {
 			go s.fireGloasPayloadAttributesEvent(blockHash, attributes, ev)
+		} else if ev != nil && !attributes.IsEmpty() {
+			log.WithFields(logrus.Fields{
+				"proposalSlot":  ev.proposalSlot,
+				"hasPayloadID":  payloadID != nil,
+				"emptyAttrs":    attributes.IsEmpty(),
+				"headBlockHash": fmt.Sprintf("%#x", bytesutil.Trunc(blockHash[:])),
+				"error":         err.Error(),
+			}).Error("BHARATH: Skipped payload_attributes SSE event: engine returned no payload ID")
 		}
 		return payloadID, nil
 	}
@@ -347,7 +355,7 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 		log.WithFields(logrus.Fields{
 			"headBlockHash":             fmt.Sprintf("%#x", bytesutil.Trunc(blockHash[:])),
 			"finalizedPayloadBlockHash": fmt.Sprintf("%#x", bytesutil.Trunc(finalizedHash[:])),
-		}).Info("Called forkchoice updated with optimistic block (Gloas)")
+		}).Info("BHARATH: Called forkchoice updated with optimistic block (Gloas)")
 		return payloadID, nil
 	case errors.Is(err, execution.ErrInvalidPayloadStatus):
 		if len(lastValidHash) == 0 {
@@ -371,8 +379,8 @@ func (s *Service) fireGloasPayloadAttributesEvent(parentBlockHash [32]byte, attr
 		return
 	}
 	log.WithFields(logrus.Fields{
-		"proposerIndex": ev.proposerIndex,
-		"proposalSlot":  ev.proposalSlot,
+		"proposerIndex":   ev.proposerIndex,
+		"proposalSlot":    ev.proposalSlot,
 		"parentBlockHash": fmt.Sprintf("%#x", parentBlockHash[:]),
 		"attributes":      attributes,
 		"headRoot":        fmt.Sprintf("%#x", ev.headRoot[:]),
