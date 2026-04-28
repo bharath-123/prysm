@@ -83,6 +83,7 @@ var appFlags = []cli.Flag{
 	flags.TerminalBlockHashOverride,
 	flags.TerminalBlockHashActivationEpochOverride,
 	flags.MevRelayEndpoint,
+	flags.BuilderWhitelistFile,
 	flags.MaxBuilderEpochMissedSlots,
 	flags.MaxBuilderConsecutiveMissedSlots,
 	flags.EngineEndpointTimeoutSeconds,

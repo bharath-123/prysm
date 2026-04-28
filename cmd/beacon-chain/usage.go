@@ -137,6 +137,7 @@ var appHelpFlagGroups = []flagGroup{
 	{ // Flags relevant to configuring local block production or external builders such as mev-boost.
 		Name: "builder",
 		Flags: []cli.Flag{
+			flags.BuilderWhitelistFile,
 			flags.LocalBlockValueBoost,
 			flags.MaxBuilderConsecutiveMissedSlots,
 			flags.MaxBuilderEpochMissedSlots,

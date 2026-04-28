@@ -13,23 +13,42 @@ type Option func(s *Service) error
 
 // FlagOptions for builder service flag configurations.
 func FlagOptions(c *cli.Context) ([]Option, error) {
+	whitelistFile := c.String(flags.BuilderWhitelistFile.Name)
 	endpoint := c.String(flags.MevRelayEndpoint.Name)
 	sszEnabled := c.Bool(flags.EnableBuilderSSZ.Name)
-	var client *builder.Client
-	if endpoint != "" {
-		var opts []builder.ClientOpt
-		if sszEnabled {
-			log.Info("Using APIs with SSZ enabled")
-			opts = append(opts, builder.WithSSZ())
-		}
-		var err error
-		client, err = builder.NewClient(endpoint, opts...)
+
+	var clientOpts []builder.ClientOpt
+	if sszEnabled {
+		log.Info("Using Builder APIs with SSZ enabled")
+		clientOpts = append(clientOpts, builder.WithSSZ())
+	}
+
+	var builderClient builder.BuilderClient
+
+	// BuilderWhitelistFile takes precedence over MevRelayEndpoint
+	if whitelistFile != "" {
+		whitelist, err := builder.LoadBuilderWhitelist(whitelistFile)
 		if err != nil {
 			return nil, err
 		}
+		multiClient, err := builder.NewMultiBuilderClient(whitelist, clientOpts...)
+		if err != nil {
+			return nil, err
+		}
+		builderClient = multiClient
+		log.WithField("file", whitelistFile).Info("Loaded builder whitelist configuration")
+	} else if endpoint != "" {
+		// Fall back to legacy single endpoint mode (MEV-Boost)
+		log.Warn("Using deprecated --http-mev-relay flag. Consider migrating to --builder-whitelist-file for direct builder connections.")
+		client, err := builder.NewClient(endpoint, clientOpts...)
+		if err != nil {
+			return nil, err
+		}
+		builderClient = client
 	}
+
 	opts := []Option{
-		WithBuilderClient(client),
+		WithBuilderClient(builderClient),
 	}
 	return opts, nil
 }
