@@ -8,6 +8,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed"
 	statefeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/state"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/gloas"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/execution"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
@@ -153,10 +154,21 @@ func (s *Service) postPayloadTasks(ctx context.Context, envelope interfaces.ROEx
 	}
 	s.headLock.Unlock()
 
-	attr := s.getPayloadAttribute(ctx, st, envelope.Slot()+1, headRoot[:], true)
+	proposalSlot := envelope.Slot() + 1
+	attr := s.getPayloadAttribute(ctx, st, proposalSlot, headRoot[:], true)
 	if s.inRegularSync() {
+		var fcuEvent *gloasFCUEvent
+		if proposerIndex, idxErr := helpers.BeaconProposerIndexAtSlot(ctx, st, proposalSlot); idxErr == nil {
+			fcuEvent = &gloasFCUEvent{
+				headRoot:      headRoot,
+				proposalSlot:  proposalSlot,
+				proposerIndex: proposerIndex,
+			}
+		} else {
+			log.WithError(idxErr).Debug("Skipping payload_attributes event: could not compute proposer index")
+		}
 		go func() {
-			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, blockHash, attr)
+			pid, err := s.notifyForkchoiceUpdateGloas(s.ctx, blockHash, attr, fcuEvent)
 			if err != nil {
 				log.WithError(err).Error("Could not notify forkchoice update")
 				return
@@ -164,8 +176,7 @@ func (s *Service) postPayloadTasks(ctx context.Context, envelope interfaces.ROEx
 			if attr != nil && !attr.IsEmpty() && pid != nil {
 				var pId [8]byte
 				copy(pId[:], pid[:])
-				s.cfg.PayloadIDCache.Set(envelope.Slot()+1, root, pId)
-				log.WithFields(logrus.Fields{"slot": envelope.Slot() + 1, "blockRoot": fmt.Sprintf("%#x", root), "payloadID": fmt.Sprintf("%#x", pid[:])}).Info("Cached payload ID for next slot")
+				s.cfg.PayloadIDCache.Set(proposalSlot, root, pId)
 			}
 		}()
 	}
@@ -288,9 +299,20 @@ func (s *Service) savePostPayload(ctx context.Context, signed interfaces.ROSigne
 	return s.cfg.BeaconDB.SaveExecutionPayloadEnvelope(ctx, protoEnv)
 }
 
+// gloasFCUEvent carries the context required to fire the payload_attributes SSE
+// event from a Gloas forkchoice update. All fields must be set when the FCU
+// includes non-empty payload attributes; pass nil to skip event firing.
+type gloasFCUEvent struct {
+	headRoot      [32]byte
+	proposalSlot  primitives.Slot
+	proposerIndex primitives.ValidatorIndex
+}
+
 // notifyForkchoiceUpdateGloas takes the block hash directly because Gloas
-// blocks don't carry an execution payload in the body.
-func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32]byte, attributes payloadattribute.Attributer) (*enginev1.PayloadIDBytes, error) {
+// blocks don't carry an execution payload in the body. When ev is non-nil and
+// the engine returns a payload ID for non-empty attributes, the payload_attributes
+// SSE event is fired so external builders/relays can build for the proposal slot.
+func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32]byte, attributes payloadattribute.Attributer, ev *gloasFCUEvent) (*enginev1.PayloadIDBytes, error) {
 	ctx, span := trace.StartSpan(ctx, "blockChain.notifyForkchoiceUpdateGloas")
 	defer span.End()
 
@@ -309,6 +331,9 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 
 	payloadID, lastValidHash, err := s.cfg.ExecutionEngineCaller.ForkchoiceUpdated(ctx, fcs, attributes)
 	if err == nil {
+		if ev != nil && payloadID != nil && !attributes.IsEmpty() {
+			go s.fireGloasPayloadAttributesEvent(blockHash, attributes, ev)
+		}
 		return payloadID, nil
 	}
 
@@ -331,4 +356,24 @@ func (s *Service) notifyForkchoiceUpdateGloas(ctx context.Context, blockHash [32
 		log.WithError(err).Error(ErrUndefinedExecutionEngineError)
 		return nil, nil
 	}
+}
+
+// fireGloasPayloadAttributesEvent sends a payload_attributes SSE event with all
+// fields pre-populated so the events server reader does not need to extract the
+// execution payload from the head block (which Gloas blocks no longer carry).
+func (s *Service) fireGloasPayloadAttributesEvent(parentBlockHash [32]byte, attributes payloadattribute.Attributer, ev *gloasFCUEvent) {
+	if !s.cfg.SyncChecker.Synced() {
+		return
+	}
+	s.cfg.StateNotifier.StateFeed().Send(&feed.Event{
+		Type: statefeed.PayloadAttributes,
+		Data: payloadattribute.EventData{
+			ProposerIndex:     ev.proposerIndex,
+			ProposalSlot:      ev.proposalSlot,
+			ParentBlockNumber: 0, // execution block number is not tracked in beacon state in Gloas
+			ParentBlockHash:   parentBlockHash[:],
+			Attributer:        attributes,
+			HeadRoot:          ev.headRoot,
+		},
+	})
 }

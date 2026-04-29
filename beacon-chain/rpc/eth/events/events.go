@@ -854,7 +854,10 @@ func (s *Server) payloadAttributesReader(ctx context.Context, ev payloadattribut
 			d.err = errors.Wrap(err, "Could not fill event data")
 			return
 		}
-		d.version = version.String(ev.HeadBlock.Version())
+		// Use the Attributer for version so callers that pre-populate the event
+		// (e.g. Gloas paths where the head block carries no execution payload)
+		// don't need to supply a HeadBlock just to resolve the fork name.
+		d.version = version.String(ev.Attributer.Version())
 		attributesBytes, err := marshalAttributes(ev.Attributer)
 		if err != nil {
 			d.err = errors.Wrap(err, "errors marshaling payload attributes to json")

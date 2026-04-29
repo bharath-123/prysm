@@ -1169,12 +1169,23 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 		if s.HasFullNode(headRoot) {
 			bh = bid.BlockHash()
 		}
-		id, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attribute)
+		proposalSlot := s.CurrentSlot() + 1
+		var fcuEvent *gloasFCUEvent
+		if proposerIndex, idxErr := helpers.BeaconProposerIndexAtSlot(ctx, headState, proposalSlot); idxErr == nil {
+			fcuEvent = &gloasFCUEvent{
+				headRoot:      headRoot,
+				proposalSlot:  proposalSlot,
+				proposerIndex: proposerIndex,
+			}
+		} else {
+			log.WithError(idxErr).Debug("Skipping payload_attributes event: could not compute proposer index")
+		}
+		id, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attribute, fcuEvent)
 		if err != nil {
 			log.WithError(err).Debug("could not perform late block tasks: failed to update forkchoice with engine")
 		}
 		if id != nil {
-			s.cfg.PayloadIDCache.Set(s.CurrentSlot()+1, headRoot, [8]byte(*id))
+			s.cfg.PayloadIDCache.Set(proposalSlot, headRoot, [8]byte(*id))
 		}
 		return
 	}

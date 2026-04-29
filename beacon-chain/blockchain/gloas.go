@@ -197,7 +197,18 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 		log.WithError(err).Error("Could not get latest block hash")
 		return
 	}
-	pid, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attr)
+	proposalSlot := currentSlot + 1
+	var fcuEvent *gloasFCUEvent
+	if proposerIndex, idxErr := helpers.BeaconProposerIndexAtSlot(ctx, st, proposalSlot); idxErr == nil {
+		fcuEvent = &gloasFCUEvent{
+			headRoot:      hr,
+			proposalSlot:  proposalSlot,
+			proposerIndex: proposerIndex,
+		}
+	} else {
+		log.WithError(idxErr).Debug("Skipping payload_attributes event: could not compute proposer index")
+	}
+	pid, err := s.notifyForkchoiceUpdateGloas(ctx, bh, attr, fcuEvent)
 	if err != nil {
 		log.WithError(err).Error("Could not notify forkchoice update")
 		return
@@ -208,5 +219,5 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 	}
 	var pId [8]byte
 	copy(pId[:], pid[:])
-	s.cfg.PayloadIDCache.Set(currentSlot+1, hr, pId)
+	s.cfg.PayloadIDCache.Set(proposalSlot, hr, pId)
 }
