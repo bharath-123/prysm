@@ -608,6 +608,7 @@ type SignedExecutionPayloadEnvelope struct {
 }
 
 type ProposerPreferences struct {
+	DependentRoot  string `json:"dependent_root"`
 	ProposalSlot   string `json:"proposal_slot"`
 	ValidatorIndex string `json:"validator_index"`
 	FeeRecipient   string `json:"fee_recipient"`

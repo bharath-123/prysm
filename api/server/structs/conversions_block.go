@@ -2978,6 +2978,7 @@ func PayloadAttestationMessageFromConsensus(m *eth.PayloadAttestationMessage) *P
 
 func ProposerPreferencesFromConsensus(p *eth.ProposerPreferences) *ProposerPreferences {
 	return &ProposerPreferences{
+		DependentRoot:  hexutil.Encode(p.DependentRoot),
 		ProposalSlot:   fmt.Sprintf("%d", p.ProposalSlot),
 		ValidatorIndex: fmt.Sprintf("%d", p.ValidatorIndex),
 		FeeRecipient:   hexutil.Encode(p.FeeRecipient),
