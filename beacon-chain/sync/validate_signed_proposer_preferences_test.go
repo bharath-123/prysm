@@ -232,6 +232,7 @@ func setupSignedProposerPreferencesService(t *testing.T) (*Service, *pubsub.Mess
 			beaconDB:    db,
 			stateGen:    stateGen,
 			clock:       startup.NewClock(chainService.Genesis, chainService.ValidatorsRoot),
+			operationNotifier: chainService.OperationNotifier(),
 		},
 	}
 	// ProposalSlot is in epoch 1 so the gossip validator's checkpoint epoch

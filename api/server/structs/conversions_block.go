@@ -2976,6 +2976,22 @@ func PayloadAttestationMessageFromConsensus(m *eth.PayloadAttestationMessage) *P
 	}
 }
 
+func ProposerPreferencesFromConsensus(p *eth.ProposerPreferences) *ProposerPreferences {
+	return &ProposerPreferences{
+		ProposalSlot:   fmt.Sprintf("%d", p.ProposalSlot),
+		ValidatorIndex: fmt.Sprintf("%d", p.ValidatorIndex),
+		FeeRecipient:   hexutil.Encode(p.FeeRecipient),
+		GasLimit:       fmt.Sprintf("%d", p.GasLimit),
+	}
+}
+
+func SignedProposerPreferencesFromConsensus(s *eth.SignedProposerPreferences) *SignedProposerPreferences {
+	return &SignedProposerPreferences{
+		Message:   ProposerPreferencesFromConsensus(s.Message),
+		Signature: hexutil.Encode(s.Signature),
+	}
+}
+
 func PayloadAttestationDataFromConsensus(d *eth.PayloadAttestationData) *PayloadAttestationData {
 	return &PayloadAttestationData{
 		BeaconBlockRoot:   hexutil.Encode(d.BeaconBlockRoot),

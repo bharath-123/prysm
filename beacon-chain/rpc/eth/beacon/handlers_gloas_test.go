@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	executiontesting "github.com/OffchainLabs/prysm/v7/beacon-chain/execution/testing"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/rpc/lookup"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/rpc/testutil"
+	fieldparams "github.com/OffchainLabs/prysm/v7/config/fieldparams"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
@@ -21,11 +23,36 @@ import (
 	"github.com/OffchainLabs/prysm/v7/testing/assert"
 	mock2 "github.com/OffchainLabs/prysm/v7/testing/mock"
 	"github.com/OffchainLabs/prysm/v7/testing/require"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+type fakeEnvelopePublisher struct {
+	called     bool
+	envelope   *ethpb.SignedExecutionPayloadEnvelope
+	blobs      [][]byte
+	cellProofs [][]byte
+	err        error
+}
+
+func (f *fakeEnvelopePublisher) PublishExecutionPayloadEnvelopeWithBlobs(
+	_ context.Context,
+	env *ethpb.SignedExecutionPayloadEnvelope,
+	blobs [][]byte,
+	cellProofs [][]byte,
+) (*emptypb.Empty, error) {
+	f.called = true
+	f.envelope = env
+	f.blobs = blobs
+	f.cellProofs = cellProofs
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &emptypb.Empty{}, nil
+}
 
 func TestGetExecutionPayloadEnvelope_AcceptsSlotID(t *testing.T) {
 	ctx := t.Context()
@@ -184,6 +211,85 @@ func TestPublishExecutionPayloadEnvelope_ServerError(t *testing.T) {
 	require.NoError(t, err)
 
 	s := &Server{V1Alpha1ValidatorServer: v1alpha1Server}
+	req := httptest.NewRequest(http.MethodPost, "/eth/v1/beacon/execution_payload_envelope", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	w.Body = &bytes.Buffer{}
+
+	s.PublishExecutionPayloadEnvelope(w, req)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestPublishExecutionPayloadEnvelope_WithBlobs(t *testing.T) {
+	signed := testSignedEnvelope()
+	jsonEnvelope, err := structs.SignedExecutionPayloadEnvelopeFromConsensus(signed)
+	require.NoError(t, err)
+
+	blob := bytesutil.PadTo([]byte("blob-0"), 131072)
+	proof := bytesutil.PadTo([]byte("proof"), 48)
+	jsonEnvelope.Blobs = []string{hexutil.Encode(blob)}
+	jsonEnvelope.CellProofs = make([]string, fieldparams.NumberOfColumns)
+	for i := range jsonEnvelope.CellProofs {
+		jsonEnvelope.CellProofs[i] = hexutil.Encode(proof)
+	}
+
+	body, err := json.Marshal(jsonEnvelope)
+	require.NoError(t, err)
+
+	publisher := &fakeEnvelopePublisher{}
+	s := &Server{ExecutionPayloadEnvelopePublisher: publisher}
+	req := httptest.NewRequest(http.MethodPost, "/eth/v1/beacon/execution_payload_envelope", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	w.Body = &bytes.Buffer{}
+
+	s.PublishExecutionPayloadEnvelope(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, true, publisher.called)
+	require.Equal(t, 1, len(publisher.blobs))
+	assert.DeepEqual(t, blob, publisher.blobs[0])
+	require.Equal(t, fieldparams.NumberOfColumns, len(publisher.cellProofs))
+}
+
+func TestPublishExecutionPayloadEnvelope_WithBlobs_MismatchedProofCount(t *testing.T) {
+	signed := testSignedEnvelope()
+	jsonEnvelope, err := structs.SignedExecutionPayloadEnvelopeFromConsensus(signed)
+	require.NoError(t, err)
+
+	blob := bytesutil.PadTo([]byte("blob-0"), 131072)
+	jsonEnvelope.Blobs = []string{hexutil.Encode(blob)}
+	jsonEnvelope.CellProofs = []string{hexutil.Encode(bytesutil.PadTo([]byte("p"), 48))} // too few
+
+	body, err := json.Marshal(jsonEnvelope)
+	require.NoError(t, err)
+
+	publisher := &fakeEnvelopePublisher{}
+	s := &Server{ExecutionPayloadEnvelopePublisher: publisher}
+	req := httptest.NewRequest(http.MethodPost, "/eth/v1/beacon/execution_payload_envelope", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	w.Body = &bytes.Buffer{}
+
+	s.PublishExecutionPayloadEnvelope(w, req)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Equal(t, false, publisher.called)
+	assert.Equal(t, true, bytes.Contains(w.Body.Bytes(), []byte("expected")))
+}
+
+func TestPublishExecutionPayloadEnvelope_WithBlobs_PublisherUnset(t *testing.T) {
+	signed := testSignedEnvelope()
+	jsonEnvelope, err := structs.SignedExecutionPayloadEnvelopeFromConsensus(signed)
+	require.NoError(t, err)
+
+	blob := bytesutil.PadTo([]byte("blob-0"), 131072)
+	jsonEnvelope.Blobs = []string{hexutil.Encode(blob)}
+	jsonEnvelope.CellProofs = make([]string, fieldparams.NumberOfColumns)
+	proof := bytesutil.PadTo([]byte("proof"), 48)
+	for i := range jsonEnvelope.CellProofs {
+		jsonEnvelope.CellProofs[i] = hexutil.Encode(proof)
+	}
+
+	body, err := json.Marshal(jsonEnvelope)
+	require.NoError(t, err)
+
+	s := &Server{}
 	req := httptest.NewRequest(http.MethodPost, "/eth/v1/beacon/execution_payload_envelope", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	w.Body = &bytes.Buffer{}

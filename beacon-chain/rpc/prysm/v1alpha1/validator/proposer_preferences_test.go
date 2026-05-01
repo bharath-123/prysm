@@ -32,6 +32,7 @@ func TestSubmitSignedProposerPreferences_OK(t *testing.T) {
 		TimeFetcher:              chain,
 		P2P:                      p2p,
 		ProposerPreferencesCache: cache,
+		OperationNotifier:        chain.OperationNotifier(),
 	}
 
 	req := &ethpb.SubmitSignedProposerPreferencesRequest{
@@ -74,6 +75,7 @@ func TestSubmitSignedProposerPreferences_Multiple(t *testing.T) {
 		TimeFetcher:              chain,
 		P2P:                      p2p,
 		ProposerPreferencesCache: c,
+		OperationNotifier:        chain.OperationNotifier(),
 	}
 
 	req := &ethpb.SubmitSignedProposerPreferencesRequest{
@@ -129,6 +131,7 @@ func TestSubmitSignedProposerPreferences_DuplicateSlot(t *testing.T) {
 		TimeFetcher:              chain,
 		P2P:                      p2p,
 		ProposerPreferencesCache: c,
+		OperationNotifier:        chain.OperationNotifier(),
 	}
 
 	req := &ethpb.SubmitSignedProposerPreferencesRequest{
@@ -207,6 +210,7 @@ func TestSubmitSignedProposerPreferences_CurrentEpochFutureSlot(t *testing.T) {
 		TimeFetcher:              chain,
 		P2P:                      p2p,
 		ProposerPreferencesCache: cache,
+		OperationNotifier:        chain.OperationNotifier(),
 	}
 
 	req := &ethpb.SubmitSignedProposerPreferencesRequest{
@@ -281,6 +285,7 @@ func TestSubmitSignedProposerPreferences_BroadcastsForProposalEpoch(t *testing.T
 		TimeFetcher:              chain,
 		P2P:                      p2p,
 		ProposerPreferencesCache: cache.NewProposerPreferencesCache(),
+		OperationNotifier:        chain.OperationNotifier(),
 	}
 
 	req := &ethpb.SubmitSignedProposerPreferencesRequest{

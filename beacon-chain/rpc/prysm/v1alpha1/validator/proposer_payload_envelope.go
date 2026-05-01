@@ -139,37 +139,104 @@ func (vs *Server) PublishExecutionPayloadEnvelope(
 	ctx, span := trace.StartSpan(ctx, "ProposerServer.PublishExecutionPayloadEnvelope")
 	defer span.End()
 
-	if req == nil || req.Message == nil || req.Message.Payload == nil {
-		return nil, status.Error(codes.InvalidArgument, "signed envelope or payload cannot be nil")
+	if err := validateSignedEnvelopeRequest(req); err != nil {
+		return nil, err
 	}
 
 	envSlot := primitives.Slot(req.Message.Payload.SlotNumber)
-	if slots.ToEpoch(envSlot) < params.BeaconConfig().GloasForkEpoch {
-		return nil, status.Errorf(codes.InvalidArgument,
-			"execution payload envelopes are not supported before Gloas fork (slot %d)", envSlot)
-	}
-
 	beaconBlockRoot := bytesutil.ToBytes32(req.Message.BeaconBlockRoot)
 	span.SetAttributes(
 		trace.Int64Attribute("slot", int64(envSlot)), // lint:ignore uintcast -- safe for tracing.
 		trace.Int64Attribute("builderIndex", int64(req.Message.BuilderIndex)),
 		trace.StringAttribute("beaconBlockRoot", fmt.Sprintf("%#x", beaconBlockRoot[:8])),
 	)
-
-	log := log.WithFields(logrus.Fields{
+	logger := log.WithFields(logrus.Fields{
 		"slot":            envSlot,
 		"builderIndex":    req.Message.BuilderIndex,
 		"beaconBlockRoot": fmt.Sprintf("%#x", beaconBlockRoot[:8]),
 	})
-	log.Info("Publishing signed execution payload envelope")
+	logger.Info("Publishing signed execution payload envelope")
 
 	// Broadcast pre-computed data column sidecars BEFORE receiving the envelope,
 	// because ReceiveExecutionPayloadEnvelope checks data availability.
 	// Sidecars were computed during ProposeBeaconBlock (storeExecutionPayloadEnvelope).
 	if err := vs.broadcastGloasDataColumns(ctx); err != nil {
-		log.WithError(err).Error("Failed to broadcast Gloas data column sidecars")
+		logger.WithError(err).Error("Failed to broadcast Gloas data column sidecars")
 	}
 
+	return vs.broadcastSignedEnvelope(ctx, req, logger)
+}
+
+// PublishExecutionPayloadEnvelopeWithBlobs validates the envelope, computes Gloas data
+// column sidecars from the supplied blobs and flat cell proofs, broadcasts the sidecars
+// to the network, and then broadcasts the signed envelope. Used by external builders
+// publishing through the HTTP API; the local self-build path uses pre-cached sidecars.
+func (vs *Server) PublishExecutionPayloadEnvelopeWithBlobs(
+	ctx context.Context,
+	req *ethpb.SignedExecutionPayloadEnvelope,
+	blobs [][]byte,
+	cellProofs [][]byte,
+) (*emptypb.Empty, error) {
+	ctx, span := trace.StartSpan(ctx, "ProposerServer.PublishExecutionPayloadEnvelopeWithBlobs")
+	defer span.End()
+
+	if err := validateSignedEnvelopeRequest(req); err != nil {
+		return nil, err
+	}
+
+	envSlot := primitives.Slot(req.Message.Payload.SlotNumber)
+	beaconBlockRoot := bytesutil.ToBytes32(req.Message.BeaconBlockRoot)
+	span.SetAttributes(
+		trace.Int64Attribute("slot", int64(envSlot)), // lint:ignore uintcast -- safe for tracing.
+		trace.Int64Attribute("builderIndex", int64(req.Message.BuilderIndex)),
+		trace.StringAttribute("beaconBlockRoot", fmt.Sprintf("%#x", beaconBlockRoot[:8])),
+		trace.Int64Attribute("blobs", int64(len(blobs))),
+	)
+	logger := log.WithFields(logrus.Fields{
+		"slot":            envSlot,
+		"builderIndex":    req.Message.BuilderIndex,
+		"beaconBlockRoot": fmt.Sprintf("%#x", beaconBlockRoot[:8]),
+		"blobs":           len(blobs),
+	})
+	logger.Info("Publishing signed execution payload envelope with blobs")
+
+	if len(blobs) > 0 {
+		cellsPerBlob, proofsPerBlob, err := peerdas.ComputeCellsAndProofsFromFlat(blobs, cellProofs)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "compute cells and proofs from blobs: %v", err)
+		}
+		roSidecars, err := peerdas.DataColumnSidecarsGloas(cellsPerBlob, proofsPerBlob, envSlot, beaconBlockRoot)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "build gloas data column sidecars: %v", err)
+		}
+		if err := vs.broadcastAndReceiveDataColumns(ctx, roSidecars); err != nil {
+			logger.WithError(err).Error("Failed to broadcast Gloas data column sidecars")
+		}
+	}
+
+	return vs.broadcastSignedEnvelope(ctx, req, logger)
+}
+
+// validateSignedEnvelopeRequest performs the shared envelope-shape and fork checks.
+func validateSignedEnvelopeRequest(req *ethpb.SignedExecutionPayloadEnvelope) error {
+	if req == nil || req.Message == nil || req.Message.Payload == nil {
+		return status.Error(codes.InvalidArgument, "signed envelope or payload cannot be nil")
+	}
+	envSlot := primitives.Slot(req.Message.Payload.SlotNumber)
+	if slots.ToEpoch(envSlot) < params.BeaconConfig().GloasForkEpoch {
+		return status.Errorf(codes.InvalidArgument,
+			"execution payload envelopes are not supported before Gloas fork (slot %d)", envSlot)
+	}
+	return nil
+}
+
+// broadcastSignedEnvelope publishes the signed envelope via P2P and imports it into
+// local fork choice. Callers are responsible for broadcasting any data column sidecars first.
+func (vs *Server) broadcastSignedEnvelope(
+	ctx context.Context,
+	req *ethpb.SignedExecutionPayloadEnvelope,
+	logger *logrus.Entry,
+) (*emptypb.Empty, error) {
 	if err := vs.P2P.Broadcast(ctx, req); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to broadcast execution payload envelope: %v", err)
 	}
@@ -182,8 +249,7 @@ func (vs *Server) PublishExecutionPayloadEnvelope(
 		return nil, status.Errorf(codes.Internal, "failed to receive execution payload envelope: %v", err)
 	}
 
-	log.Info("Successfully published execution payload envelope")
-
+	logger.Info("Successfully published execution payload envelope")
 	return &emptypb.Empty{}, nil
 }
 

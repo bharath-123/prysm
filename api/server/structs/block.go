@@ -601,6 +601,20 @@ type ExecutionPayloadEnvelope struct {
 }
 
 type SignedExecutionPayloadEnvelope struct {
-	Message   *ExecutionPayloadEnvelope `json:"message"`
-	Signature string                    `json:"signature"`
+	Message    *ExecutionPayloadEnvelope `json:"message"`
+	Signature  string                    `json:"signature"`
+	Blobs      []string                  `json:"blobs,omitempty"`
+	CellProofs []string                  `json:"cell_proofs,omitempty"`
+}
+
+type ProposerPreferences struct {
+	ProposalSlot   string `json:"proposal_slot"`
+	ValidatorIndex string `json:"validator_index"`
+	FeeRecipient   string `json:"fee_recipient"`
+	GasLimit       string `json:"gas_limit"`
+}
+
+type SignedProposerPreferences struct {
+	Message   *ProposerPreferences `json:"message"`
+	Signature string               `json:"signature"`
 }

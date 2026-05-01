@@ -117,3 +117,8 @@ type PayloadEvent struct {
 	Slot      string `json:"slot"`
 	BlockRoot string `json:"block_root"`
 }
+
+type ProposerPreferencesEvent struct {
+	Version string                     `json:"version"`
+	Data    *SignedProposerPreferences `json:"data"`
+}
