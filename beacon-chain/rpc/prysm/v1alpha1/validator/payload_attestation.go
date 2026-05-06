@@ -107,9 +107,10 @@ func (vs *Server) SubmitPayloadAttestation(
 			"payload attestation message slot must match current slot: got %d, current %d", msg.Data.Slot, currentSlot)
 	}
 
-	if err := vs.P2P.Broadcast(ctx, msg); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not broadcast payload attestation message: %v", err)
-	}
+	// TESTING: PTC vote gossip broadcast disabled. The vote is still applied
+	// locally (forkchoice + pool) below so this node sees its own attestation,
+	// but it is not published to peers.
+	log.WithField("slot", msg.Data.Slot).Warn("PTC vote broadcast disabled for testing — not gossiping")
 
 	if err := vs.PayloadAttestationReceiver.ReceivePayloadAttestationMessage(ctx, msg); err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not process payload attestation message: %v", err)
