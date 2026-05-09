@@ -2,6 +2,7 @@ package validator
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	chainMock "github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain/testing"
@@ -114,6 +115,53 @@ func TestPayloadAttestationData_CachedPerSlot(t *testing.T) {
 	require.DeepEqual(t, newRoot, third.BeaconBlockRoot)
 	assert.Equal(t, nextSlot, third.Slot)
 	assert.Equal(t, true, third.PayloadPresent)
+}
+
+func TestPayloadAttestationData_ConcurrentSingleflight(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig().Copy()
+	cfg.GloasForkEpoch = 0
+	params.OverrideBeaconConfig(cfg)
+
+	slot := primitives.Slot(7)
+	root := bytesutil.PadTo([]byte{0xAA}, 32)
+	chain := &chainMock.ChainService{
+		Slot: &slot,
+		Root: root,
+		MockCanonicalRoots: map[primitives.Slot][32]byte{
+			slot: bytesutil.ToBytes32(root),
+		},
+		MockCanonicalFull: map[primitives.Slot]bool{slot: false},
+	}
+	vs := &Server{
+		SyncChecker:       &mockSync.Sync{IsSyncing: false},
+		TimeFetcher:       chain,
+		HeadFetcher:       chain,
+		ForkchoiceFetcher: chain,
+	}
+
+	const callers = 16
+	results := make([]*ethpb.PayloadAttestationData, callers)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range callers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			resp, err := vs.PayloadAttestationData(t.Context(), &ethpb.PayloadAttestationDataRequest{Slot: slot})
+			require.NoError(t, err)
+			results[i] = resp
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	// All concurrent callers must receive the exact same pointer — proves the
+	// burst was deduplicated rather than each computing independently.
+	for i := 1; i < callers; i++ {
+		assert.Equal(t, true, results[0] == results[i])
+	}
 }
 
 func TestPayloadAttestationData_SlotMismatch(t *testing.T) {

@@ -1,20 +1,25 @@
 package beacon
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 
 	"github.com/OffchainLabs/prysm/v7/api"
 	"github.com/OffchainLabs/prysm/v7/api/server/structs"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain/kzg"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/peerdas"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/rpc/eth/shared"
 	fieldparams "github.com/OffchainLabs/prysm/v7/config/fieldparams"
+	consensusblocks "github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
+	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
+	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	"github.com/OffchainLabs/prysm/v7/network/httputil"
 	eth "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -85,10 +90,9 @@ func (s *Server) GetExecutionPayloadEnvelope(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-// PublishExecutionPayloadEnvelope broadcasts a signed execution payload envelope.
-// When the request includes blobs and cell proofs, the beacon node computes Gloas
-// data column sidecars and broadcasts them to the network before the envelope.
-//
+// PublishExecutionPayloadEnvelope broadcasts a signed envelope. Body may be
+// either SignedExecutionPayloadEnvelope (stateful) or
+// SignedExecutionPayloadEnvelopeContents (stateless, with blobs+proofs).
 // Endpoint: POST /eth/v1/beacon/execution_payload_envelope
 func (s *Server) PublishExecutionPayloadEnvelope(w http.ResponseWriter, r *http.Request) {
 	ctx, span := trace.StartSpan(r.Context(), "beacon.PublishExecutionPayloadEnvelope")
@@ -97,6 +101,18 @@ func (s *Server) PublishExecutionPayloadEnvelope(w http.ResponseWriter, r *http.
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		httputil.HandleError(w, "could not read request body: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Contents wraps the signed envelope alongside blobs/kzg_proofs; the
+	// wrapper key distinguishes it from a bare envelope body.
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(body, &probe); err != nil {
+		httputil.HandleError(w, "could not decode request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, isContents := probe["signed_execution_payload_envelope"]; isContents {
+		s.publishExecutionPayloadEnvelopeContents(ctx, w, body)
 		return
 	}
 
@@ -112,70 +128,104 @@ func (s *Server) PublishExecutionPayloadEnvelope(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if len(jsonEnvelope.Blobs) > 0 {
-		blobs, cellProofs, err := decodeEnvelopeBlobs(jsonEnvelope.Blobs, jsonEnvelope.CellProofs)
-		if err != nil {
-			httputil.HandleError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if s.ExecutionPayloadEnvelopePublisher == nil {
-			httputil.HandleError(w, "execution payload envelope publisher not configured", http.StatusInternalServerError)
-			return
-		}
-		if _, err := s.ExecutionPayloadEnvelopePublisher.PublishExecutionPayloadEnvelopeWithBlobs(ctx, consensus, blobs, cellProofs); err != nil {
-			handlePublishEnvelopeError(w, err)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	if _, err := s.V1Alpha1ValidatorServer.PublishExecutionPayloadEnvelope(ctx, consensus); err != nil {
-		handlePublishEnvelopeError(w, err)
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				httputil.HandleError(w, st.Message(), http.StatusBadRequest)
+			default:
+				httputil.HandleError(w, st.Message(), http.StatusInternalServerError)
+			}
+			return
+		}
+		httputil.HandleError(w, "could not publish execution payload envelope: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-// decodeEnvelopeBlobs converts hex-encoded blobs and flat cell proofs to bytes and
-// validates that the cell proof count matches len(blobs) * NUMBER_OF_COLUMNS.
-func decodeEnvelopeBlobs(hexBlobs, hexCellProofs []string) ([][]byte, [][]byte, error) {
-	expectedProofs := len(hexBlobs) * fieldparams.NumberOfColumns
-	if len(hexCellProofs) != expectedProofs {
-		return nil, nil, errors.Errorf("expected %d cell proofs (%d blobs * %d columns), got %d",
-			expectedProofs, len(hexBlobs), fieldparams.NumberOfColumns, len(hexCellProofs))
-	}
-	blobs := make([][]byte, len(hexBlobs))
-	for i, h := range hexBlobs {
-		b, err := hexutil.Decode(h)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "invalid blob[%d]", i)
-		}
-		blobs[i] = b
-	}
-	proofs := make([][]byte, len(hexCellProofs))
-	for i, h := range hexCellProofs {
-		p, err := hexutil.Decode(h)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "invalid cell_proof[%d]", i)
-		}
-		proofs[i] = p
-	}
-	return blobs, proofs, nil
-}
 
-func handlePublishEnvelopeError(w http.ResponseWriter, err error) {
-	if st, ok := status.FromError(err); ok {
-		switch st.Code() {
-		case codes.InvalidArgument:
-			httputil.HandleError(w, st.Message(), http.StatusBadRequest)
-		default:
-			httputil.HandleError(w, st.Message(), http.StatusInternalServerError)
-		}
+// publishExecutionPayloadEnvelopeContents handles the stateless variant:
+// verifies caller-supplied blobs/proofs, broadcasts derived sidecars, then
+// delegates the envelope to the bare publish path.
+func (s *Server) publishExecutionPayloadEnvelopeContents(ctx context.Context, w http.ResponseWriter, body []byte) {
+	var contents structs.SignedExecutionPayloadEnvelopeContents
+	if err := json.Unmarshal(body, &contents); err != nil {
+		httputil.HandleError(w, "could not decode envelope contents: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	httputil.HandleError(w, "could not publish execution payload envelope: "+err.Error(), http.StatusInternalServerError)
+	signed, kzgProofs, blobs, err := contents.ToConsensus()
+	if err != nil {
+		httputil.HandleError(w, "invalid signed execution payload envelope contents: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if len(blobs) > 0 {
+		blockRoot := bytesutil.ToBytes32(signed.Message.BeaconBlockRoot)
+		cellsPerBlob, proofsPerBlob, err := peerdas.ComputeCellsAndProofsFromFlat(blobs, kzgProofs)
+		if err != nil {
+			httputil.HandleError(w, "could not compute cells and proofs: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		// External trust boundary — verify before broadcasting/storing.
+		if err := verifyCellProofs(blobs, kzgProofs); err != nil {
+			httputil.HandleError(w, "kzg verification failed: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		roSidecars, err := peerdas.DataColumnSidecarsGloas(cellsPerBlob, proofsPerBlob, primitives.Slot(signed.Message.Payload.SlotNumber), blockRoot)
+		if err != nil {
+			httputil.HandleError(w, "could not build data column sidecars: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		verifiedSidecars := make([]consensusblocks.VerifiedRODataColumn, 0, len(roSidecars))
+		for _, sc := range roSidecars {
+			verifiedSidecars = append(verifiedSidecars, consensusblocks.NewVerifiedRODataColumn(sc))
+		}
+		if err := s.Broadcaster.BroadcastDataColumnSidecars(ctx, verifiedSidecars); err != nil {
+			httputil.HandleError(w, "could not broadcast data column sidecars: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := s.DataColumnReceiver.ReceiveDataColumns(verifiedSidecars); err != nil {
+			httputil.HandleError(w, "could not receive data column sidecars: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if _, err := s.V1Alpha1ValidatorServer.PublishExecutionPayloadEnvelope(ctx, signed); err != nil {
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				httputil.HandleError(w, st.Message(), http.StatusBadRequest)
+			default:
+				httputil.HandleError(w, st.Message(), http.StatusInternalServerError)
+			}
+			return
+		}
+		httputil.HandleError(w, "could not publish execution payload envelope contents: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// verifyCellProofs batch-verifies cell proofs against commitments derived
+// from the supplied blobs. Does not tie data to a specific block — that needs
+// the block's BlobKzgCommitments which a stateless receiver may not have.
+func verifyCellProofs(blobs [][]byte, flatProofs [][]byte) error {
+	commitments := make([][]byte, len(blobs))
+	for i, blob := range blobs {
+		if len(blob) != len(kzg.Blob{}) {
+			return errors.Errorf("blob %d has wrong size %d", i, len(blob))
+		}
+		var b kzg.Blob
+		copy(b[:], blob)
+		c, err := kzg.BlobToKZGCommitment(&b)
+		if err != nil {
+			return errors.Wrapf(err, "compute kzg commitment for blob %d", i)
+		}
+		commitments[i] = c[:]
+	}
+	return kzg.VerifyCellKZGProofBatchFromBlobData(blobs, commitments, flatProofs, fieldparams.NumberOfColumns)
 }
 
 // PublishSignedExecutionPayloadBid broadcasts a signed execution payload bid to the P2P network.

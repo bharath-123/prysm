@@ -79,5 +79,8 @@ func (s *Service) PtcLookupState(ctx context.Context, blockRoot [32]byte, blockS
 
 		return transition.ProcessSlotsUsingNextSlotCache(ctx, headState, headRoot, blockSlot)
 	}
+	if st := s.cfg.StateGen.StateByRootIfCachedNoCopy(blockRoot); st != nil && slots.ToEpoch(st.Slot()) == blockEpoch {
+		return st, nil
+	}
 	return nil, nil
 }

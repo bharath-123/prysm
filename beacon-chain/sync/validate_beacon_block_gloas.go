@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain"
 	p2ptypes "github.com/OffchainLabs/prysm/v7/beacon-chain/p2p/types"
@@ -73,19 +74,17 @@ func (s *Service) validateExecutionPayloadBidParentValid(_ context.Context, blk 
 	return pubsub.ValidationAccept, nil
 }
 
-// requestPayloadEnvelope fetches the envelope for root, retrying across
-// shuffled peers. Singleflight collapses concurrent calls for the same root.
 func (s *Service) requestPayloadEnvelope(root [32]byte) {
 	if s.cfg.chain.HasFullNode(root) || s.hasBadPayload(root) {
 		return
 	}
-	_, _, _ = s.payloadEnvelopeRequestSingleFlight.Do(string(root[:]), func() (any, error) {
+	key := fmt.Sprintf("%#x", root)
+	_, _, _ = s.payloadEnvelopeRequestSingleFlight.Do(key, func() (any, error) {
 		s.fetchPayloadEnvelope(root)
 		return nil, nil
 	})
 }
 
-// Cap per-call peer attempts; the drain loop retries on later ticks.
 const maxPayloadEnvelopeFetchAttempts = 3
 
 func (s *Service) fetchPayloadEnvelope(root [32]byte) {

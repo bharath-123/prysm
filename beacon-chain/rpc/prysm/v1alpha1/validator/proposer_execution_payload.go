@@ -140,7 +140,7 @@ func (vs *Server) getLocalPayloadFromEngine(
 	var attr payloadattribute.Attributer
 	switch {
 	case st.Version() >= version.Gloas:
-		withdrawals, err := vs.computePayloadWithdrawals(ctx, st, parentRoot, parentFull)
+		withdrawals, err := vs.computePayloadWithdrawals(st, parentFull)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +285,7 @@ var (
 )
 
 // computePayloadWithdrawals returns the withdrawals for the next payload.
-func (vs *Server) computePayloadWithdrawals(_ context.Context, st state.BeaconState, _ [32]byte, parentFull bool) ([]*enginev1.Withdrawal, error) {
+func (vs *Server) computePayloadWithdrawals(st state.BeaconState, parentFull bool) ([]*enginev1.Withdrawal, error) {
 	if !parentFull {
 		return st.PayloadExpectedWithdrawals()
 	}

@@ -3,11 +3,13 @@ package validator
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed"
 	opfeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/operation"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/gloas"
 	"github.com/OffchainLabs/prysm/v7/config/params"
+	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/time/slots"
@@ -47,38 +49,51 @@ func (vs *Server) PayloadAttestationData(
 		return cached, nil
 	}
 
-	highestReceivedSlot := vs.ForkchoiceFetcher.HighestReceivedBlockSlot()
-	if highestReceivedSlot != slot {
-		return nil, status.Errorf(
-			codes.Unavailable,
-			"no valid block root for slot %d, highest received block slot is %d",
-			slot,
-			highestReceivedSlot,
-		)
-	}
-	root := vs.ForkchoiceFetcher.HighestReceivedBlockRoot()
-	if root == [32]byte{} {
-		return nil, status.Errorf(codes.Internal, "could not retrieve highest received block root for slot %d", slot)
-	}
-	payloadPresent := vs.ForkchoiceFetcher.HasFullNode(root)
-	payloadStr := "empty"
-	if payloadPresent {
-		payloadStr = "full"
-	}
-	log.WithFields(logrus.Fields{
-		"slot":      slot,
-		"blockRoot": fmt.Sprintf("%#x", root),
-		"payload":   payloadStr,
-	}).Info("PTC request")
+	// dedupe concurrent callers at the PTC deadline.
+	v, err, _ := vs.payloadAttestationFlight.Do(strconv.FormatUint(uint64(slot), 10), func() (any, error) {
+		if cached := vs.payloadAttestationData.Load(); cached != nil && cached.Slot == slot {
+			return cached, nil
+		}
 
-	resp := &ethpb.PayloadAttestationData{
-		BeaconBlockRoot:   root[:],
-		Slot:              slot,
-		PayloadPresent:    payloadPresent,
-		BlobDataAvailable: payloadPresent, // TODO: Replace with real DA availability once DA paths are wired.
+		highestReceivedSlot := vs.ForkchoiceFetcher.HighestReceivedBlockSlot()
+		if highestReceivedSlot != slot {
+			return nil, status.Errorf(
+				codes.Unavailable,
+				"no valid block root for slot %d, highest received block slot is %d",
+				slot,
+				highestReceivedSlot,
+			)
+		}
+		root := vs.ForkchoiceFetcher.HighestReceivedBlockRoot()
+		if root == [32]byte{} {
+			return nil, status.Errorf(codes.Internal, "could not retrieve highest received block root for slot %d", slot)
+		}
+		payloadPresent := vs.ForkchoiceFetcher.HasFullNode(root)
+
+		resp := &ethpb.PayloadAttestationData{
+			BeaconBlockRoot:   root[:],
+			Slot:              slot,
+			PayloadPresent:    payloadPresent,
+			BlobDataAvailable: payloadPresent, // TODO: Replace with real DA availability once DA paths are wired.
+		}
+		vs.payloadAttestationData.Store(resp)
+
+		payloadStr := "empty"
+		if payloadPresent {
+			payloadStr = "full"
+		}
+		log.WithFields(logrus.Fields{
+			"slot":      slot,
+			"blockRoot": fmt.Sprintf("%#x", root),
+			"payload":   payloadStr,
+		}).Info("PTC request")
+
+		return resp, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	vs.payloadAttestationData.Store(resp)
-	return resp, nil
+	return v.(*ethpb.PayloadAttestationData), nil
 }
 
 // SubmitPayloadAttestation submits a payload attestation message to the network
@@ -130,14 +145,27 @@ func (vs *Server) SubmitPayloadAttestation(
 		},
 	})
 
-	log.WithField("slot", msg.Data.Slot).Debug("Submitted payload attestation message")
+	payloadStr := "empty"
+	if msg.Data.PayloadPresent {
+		payloadStr = "full"
+	}
+	log.WithFields(logrus.Fields{
+		"slot":           msg.Data.Slot,
+		"blockRoot":      fmt.Sprintf("%#x", msg.Data.BeaconBlockRoot),
+		"payload":        payloadStr,
+		"validatorIndex": msg.ValidatorIndex,
+	}).Debug("Submitted payload attestation message")
 	return &emptypb.Empty{}, nil
 }
 
 func (vs *Server) payloadAttestationCommitteeIndex(ctx context.Context, msg *ethpb.PayloadAttestationMessage) (uint64, error) {
-	st, err := vs.HeadFetcher.HeadStateReadOnly(ctx)
+	root := bytesutil.ToBytes32(msg.Data.BeaconBlockRoot)
+	st, err := vs.PayloadAttestationReceiver.PtcLookupState(ctx, root, msg.Data.Slot)
 	if err != nil {
 		return 0, err
+	}
+	if st == nil {
+		return 0, status.Errorf(codes.Unavailable, "unable to find state for payload attestation")
 	}
 	return gloas.PayloadCommitteeIndex(ctx, st, msg.Data.Slot, msg.ValidatorIndex)
 }

@@ -602,10 +602,17 @@ type ExecutionPayloadEnvelope struct {
 }
 
 type SignedExecutionPayloadEnvelope struct {
-	Message    *ExecutionPayloadEnvelope `json:"message"`
-	Signature  string                    `json:"signature"`
-	Blobs      []string                  `json:"blobs,omitempty"`
-	CellProofs []string                  `json:"cell_proofs,omitempty"`
+	Message   *ExecutionPayloadEnvelope `json:"message"`
+	Signature string                    `json:"signature"`
+}
+
+// SignedExecutionPayloadEnvelopeContents bundles a signed execution payload
+// envelope with the raw blobs and KZG proofs needed by a beacon node that has
+// not cached them locally. Used by the stateless publish path.
+type SignedExecutionPayloadEnvelopeContents struct {
+	SignedExecutionPayloadEnvelope *SignedExecutionPayloadEnvelope `json:"signed_execution_payload_envelope"`
+	KzgProofs                      []string                        `json:"kzg_proofs"`
+	Blobs                          []string                        `json:"blobs"`
 }
 
 type ProposerPreferences struct {
