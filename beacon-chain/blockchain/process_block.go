@@ -1176,12 +1176,17 @@ func (s *Service) lateBlockTasks(ctx context.Context) {
 			bh = bid.BlockHash()
 		}
 		proposalSlot := s.CurrentSlot() + 1
+		parentBH, bhErr := headState.LatestBlockHash()
+		if bhErr != nil {
+			log.WithError(bhErr).Debug("Could not get latest block hash for FCU event")
+		}
 		var fcuEvent *gloasFCUEvent
 		if proposerIndex, idxErr := helpers.BeaconProposerIndexAtSlot(ctx, headState, proposalSlot); idxErr == nil {
 			fcuEvent = &gloasFCUEvent{
-				headRoot:      headRoot,
-				proposalSlot:  proposalSlot,
-				proposerIndex: proposerIndex,
+				headRoot:        headRoot,
+				proposalSlot:    proposalSlot,
+				proposerIndex:   proposerIndex,
+				parentBlockHash: parentBH,
 			}
 		} else {
 			log.WithError(idxErr).Debug("Skipping payload_attributes event: could not compute proposer index")

@@ -164,12 +164,17 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 			if hashErr != nil {
 				log.WithError(hashErr).Error("Could not get block hash from forkchoice for FCU")
 			} else {
+				parentBH, bhErr := headState.LatestBlockHash()
+				if bhErr != nil {
+					log.WithError(bhErr).Debug("Could not get latest block hash for FCU event")
+				}
 				var fcuEvent *gloasFCUEvent
 				if proposerIndex, idxErr := helpers.BeaconProposerIndexAtSlot(ctx, headState, proposingSlot); idxErr == nil {
 					fcuEvent = &gloasFCUEvent{
-						headRoot:      newHeadRoot,
-						proposalSlot:  proposingSlot,
-						proposerIndex: proposerIndex,
+						headRoot:        newHeadRoot,
+						proposalSlot:    proposingSlot,
+						proposerIndex:   proposerIndex,
+						parentBlockHash: parentBH,
 					}
 				} else {
 					log.WithError(idxErr).Debug("Skipping payload_attributes event: could not compute proposer index")

@@ -211,9 +211,10 @@ func (s *Service) latePayloadTasks(ctx context.Context) {
 	var fcuEvent *gloasFCUEvent
 	if proposerIndex, idxErr := helpers.BeaconProposerIndexAtSlot(ctx, st, proposalSlot); idxErr == nil {
 		fcuEvent = &gloasFCUEvent{
-			headRoot:      hr,
-			proposalSlot:  proposalSlot,
-			proposerIndex: proposerIndex,
+			headRoot:        hr,
+			proposalSlot:    proposalSlot,
+			proposerIndex:   proposerIndex,
+			parentBlockHash: bh,
 		}
 	} else {
 		log.WithError(idxErr).Debug("Skipping payload_attributes event: could not compute proposer index")
