@@ -181,6 +181,10 @@ var (
 		Name:  "enable-experimental-attestation-pool",
 		Usage: "Enables an experimental attestation pool design.",
 	}
+	enableHezeTicketCache = &cli.BoolFlag{
+		Name:  "enable-heze-ticket-cache",
+		Usage: "(Experimental, Heze): Routes Gloas-version forkchoice updates to engine_forkchoiceUpdatedV5 and caches the returned blob-streaming tickets for AOT data column sidecar validation.",
+	}
 	EnableStateDiff = &cli.BoolFlag{
 		Name:  "enable-state-diff",
 		Usage: "Enables the experimental state diff feature.",
@@ -280,6 +284,7 @@ var BeaconChainFlags = combinedFlags([]cli.Flag{
 	DisableQUIC,
 	EnableDiscoveryReboot,
 	enableExperimentalAttestationPool,
+	enableHezeTicketCache,
 	EnableStateDiff,
 	forceHeadFlag,
 	blacklistRoots,

@@ -1145,6 +1145,7 @@ func (s *Service) prysmBeaconEndpoints(
 		CoreService:           coreService,
 		Broadcaster:           s.cfg.Broadcaster,
 		BlobReceiver:          s.cfg.BlobReceiver,
+		TicketCache:           s.cfg.TicketCache,
 	}
 
 	const namespace = "prysm.beacon"
@@ -1233,6 +1234,16 @@ func (s *Service) prysmBeaconEndpoints(
 			},
 			handler: server.QueryBeaconBlock,
 			methods: []string{http.MethodPost},
+		},
+		{
+			template: "/prysm/v1/beacon/blob_streaming/active_tickets",
+			name:     namespace + ".GetActiveBlobStreamingTickets",
+			middleware: []middleware.Middleware{
+				middleware.AcceptHeaderHandler([]string{api.JsonMediaType}),
+				middleware.AcceptEncodingHeaderHandler(),
+			},
+			handler: server.GetActiveBlobStreamingTickets,
+			methods: []string{http.MethodGet},
 		},
 	}
 }

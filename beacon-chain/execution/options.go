@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache/ticketcache"
 	statefeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/state"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
@@ -129,6 +130,15 @@ func WithVerifierWaiter(v *verification.InitializerWaiter) Option {
 func WithGraffitiInfo(g *GraffitiInfo) Option {
 	return func(s *Service) error {
 		s.graffitiInfo = g
+		return nil
+	}
+}
+
+// WithTicketCache wires the Heze blob-streaming ticket cache so that
+// engine_forkchoiceUpdatedV5 responses populate it.
+func WithTicketCache(c *ticketcache.Cache) Option {
+	return func(s *Service) error {
+		s.ticketCache = c
 		return nil
 	}
 }

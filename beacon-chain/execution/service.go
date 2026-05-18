@@ -15,6 +15,7 @@ import (
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache/depositsnapshot"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache/ticketcache"
 	statefeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/state"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/transition"
@@ -163,6 +164,13 @@ type Service struct {
 	blobVerifier            verification.NewBlobVerifier
 	capabilityCache         *capabilityCache
 	graffitiInfo            *GraffitiInfo
+	ticketCache             *ticketcache.Cache
+}
+
+// TicketCache returns the Heze blob-streaming ticket cache, or nil if it
+// hasn't been wired (e.g., pre-Heze or with --enable-heze-ticket-cache off).
+func (s *Service) TicketCache() *ticketcache.Cache {
+	return s.ticketCache
 }
 
 // NewService sets up a new instance with an ethclient when given a web3 endpoint as a string in the config.
