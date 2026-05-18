@@ -296,3 +296,17 @@ type SSZQueryRequest struct {
 	Query        string `json:"query"`
 	IncludeProof bool   `json:"include_proof,omitempty"`
 }
+
+// ActiveBlobStreamingTicket is a single ticket as exposed via the Heze
+// blob-streaming active-tickets endpoint.
+type ActiveBlobStreamingTicket struct {
+	TicketID    string `json:"ticket_id"`
+	TargetSlot  string `json:"target_slot"`
+	Owner       string `json:"owner"`
+	BLSPubkey   string `json:"bls_pubkey"`
+	BlobCount   string `json:"blob_count"`
+}
+
+type GetActiveBlobStreamingTicketsResponse struct {
+	Data []*ActiveBlobStreamingTicket `json:"data"`
+}

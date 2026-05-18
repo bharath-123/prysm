@@ -26,6 +26,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/builder"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache/depositsnapshot"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache/ticketcache"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/das"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db/filesystem"
@@ -104,6 +105,7 @@ type BeaconNode struct {
 	syncCommitteePool        synccommittee.Pool
 	blsToExecPool            blstoexec.PoolManager
 	depositCache             cache.DepositCache
+	ticketCache              *ticketcache.Cache
 	trackedValidatorsCache   *cache.TrackedValidatorsCache
 	proposerPreferencesCache *cache.ProposerPreferencesCache
 	payloadIDCache           *cache.PayloadIDCache
@@ -170,6 +172,7 @@ func New(cliCtx *cli.Context, cancel context.CancelFunc, optFuncs []func(*cli.Co
 		slashingsPool:          slashings.NewPool(),
 		syncCommitteePool:      synccommittee.NewPool(),
 		blsToExecPool:          blstoexec.NewPool(),
+		ticketCache:            ticketcache.New(time.Time{}),
 		trackedValidatorsCache: cache.NewTrackedValidatorsCache(),
 		// TODO(gloas): revisit whether trackedValidatorsCache and
 		// proposerPreferencesCache should remain separate. The tracked
@@ -819,11 +822,23 @@ func (b *BeaconNode) registerPOWChainService() error {
 		execution.WithJwtId(b.cliCtx.String(flags.JwtId.Name)),
 		execution.WithVerifierWaiter(b.verifyInitWaiter),
 		execution.WithGraffitiInfo(graffitiInfo),
+		execution.WithTicketCache(b.ticketCache),
 	)
 	web3Service, err := execution.NewService(b.ctx, opts...)
 	if err != nil {
 		return errors.Wrap(err, "could not register proof-of-work chain web3Service")
 	}
+
+	// Stamp genesis time onto the ticket cache once the clock resolves; the
+	// cache uses it to derive each ticket's target slot from the EL's
+	// selling-block timestamp.
+	go func() {
+		clock, err := b.ClockWaiter.WaitForClock(b.ctx)
+		if err != nil {
+			return
+		}
+		b.ticketCache.SetGenesis(clock.GenesisTime())
+	}()
 
 	return b.services.RegisterService(web3Service)
 }
@@ -1039,6 +1054,7 @@ func (b *BeaconNode) registerRPCService(router *http.ServeMux) error {
 		ExecutionPayloadEnvelopeCache:    b.executionPayloadCache,
 		LCStore:                          b.lcStore,
 		GraffitiInfo:                     web3Service.GraffitiInfo(),
+		TicketCache:                      b.ticketCache,
 	})
 
 	return b.services.RegisterService(rpcService)

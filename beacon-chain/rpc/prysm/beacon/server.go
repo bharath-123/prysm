@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache/ticketcache"
 	beacondb "github.com/OffchainLabs/prysm/v7/beacon-chain/db"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/rpc/core"
@@ -24,4 +25,5 @@ type Server struct {
 	CoreService           *core.Service
 	Broadcaster           p2p.Broadcaster
 	BlobReceiver          blockchain.BlobReceiver
+	TicketCache           *ticketcache.Cache
 }

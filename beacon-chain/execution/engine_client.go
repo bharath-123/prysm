@@ -9,11 +9,13 @@ import (
 
 	"github.com/OffchainLabs/prysm/v7/api/server/structs"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain/kzg"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache/ticketcache"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/peerdas"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/execution/types"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/verification"
 	"github.com/OffchainLabs/prysm/v7/cmd/beacon-chain/flags"
 	fieldparams "github.com/OffchainLabs/prysm/v7/config/fieldparams"
+	"github.com/OffchainLabs/prysm/v7/config/features"
 	"github.com/OffchainLabs/prysm/v7/config/params"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
@@ -111,6 +113,9 @@ const (
 	GetPayloadMethodV6 = "engine_getPayloadV6"
 	// ForkchoiceUpdatedMethodV4 is the forkchoice updated method added for gloas/amsterdam.
 	ForkchoiceUpdatedMethodV4 = "engine_forkchoiceUpdatedV4"
+	// ForkchoiceUpdatedMethodV5 is the forkchoice updated method added for heze blob-streaming.
+	// It mirrors V4 and additionally returns the active blob-streaming ticket set.
+	ForkchoiceUpdatedMethodV5 = "engine_forkchoiceUpdatedV5"
 	// BlockByHashMethod request string for JSON-RPC.
 	BlockByHashMethod = "eth_getBlockByHash"
 	// BlockByNumberMethod request string for JSON-RPC.
@@ -139,10 +144,27 @@ var errInvalidPayloadBodyResponse = errors.New("engine api payload body response
 
 // ForkchoiceUpdatedResponse is the response kind received by the
 // engine_forkchoiceUpdatedV1 endpoint.
+//
+// ActiveTickets is populated only by engine_forkchoiceUpdatedV5 (Heze
+// blob-streaming). For V1-V4 calls the EL omits the field; with omitempty the
+// decoder leaves the slice nil.
 type ForkchoiceUpdatedResponse struct {
 	Status          *pb.PayloadStatus  `json:"payloadStatus"`
 	PayloadId       *pb.PayloadIDBytes `json:"payloadId"`
 	ValidationError string             `json:"validationError"`
+	ActiveTickets   []*TicketInfoV1    `json:"activeTickets,omitempty"`
+}
+
+// TicketInfoV1 mirrors go-ethereum's engine.TicketInfoV1 returned in the
+// activeTickets field of engine_forkchoiceUpdatedV5. The selling-block
+// timestamp is the timestamp of the EL block that minted the ticket; the
+// consensus client converts it to a target slot.
+type TicketInfoV1 struct {
+	TicketID              hexutil.Uint64 `json:"ticketId"`
+	SellingBlockTimestamp hexutil.Uint64 `json:"sellingBlockTimestamp"`
+	Owner                 common.Address `json:"owner"`
+	BLSPubkey             hexutil.Bytes  `json:"blsPubkey"`
+	BlobCount             hexutil.Uint64 `json:"blobCount"`
 }
 
 // Reconstructor defines a service responsible for reconstructing full beacon chain objects by utilizing the execution API and making requests through the execution client.
@@ -300,9 +322,16 @@ func (s *Service) ForkchoiceUpdated(
 		if err != nil {
 			return nil, nil, err
 		}
-		err = s.rpcClient.CallContext(ctx, result, ForkchoiceUpdatedMethodV4, state, a)
+		method := ForkchoiceUpdatedMethodV4
+		if features.Get().EnableHezeTicketCache {
+			method = ForkchoiceUpdatedMethodV5
+		}
+		err = s.rpcClient.CallContext(ctx, result, method, state, a)
 		if err != nil {
 			return nil, nil, handleRPCError(err)
+		}
+		if s.ticketCache != nil && method == ForkchoiceUpdatedMethodV5 {
+			s.replaceTicketCache(result.ActiveTickets)
 		}
 	default:
 		return nil, nil, fmt.Errorf("unknown payload attribute version: %v", attrs.Version())
@@ -386,6 +415,9 @@ func (s *Service) ExchangeCapabilities(ctx context.Context) ([]string, error) {
 
 	if params.GloasEnabled() {
 		supportedEngineEndpoints = append(supportedEngineEndpoints, gloasEngineEndpoints...)
+		if features.Get().EnableHezeTicketCache {
+			supportedEngineEndpoints = append(supportedEngineEndpoints, ForkchoiceUpdatedMethodV5)
+		}
 	}
 
 	elSupportedEndpointsSlice := make([]string, len(supportedEngineEndpoints))
@@ -1312,4 +1344,32 @@ func toBlockNumArg(number *big.Int) string {
 // wrapWithBlockRoot returns a new error with the given block root.
 func wrapWithBlockRoot(err error, blockRoot [fieldparams.RootLength]byte, message string) error {
 	return errors.Wrap(err, fmt.Sprintf("%s for block %#x", message, blockRoot))
+}
+
+// replaceTicketCache projects the engine_forkchoiceUpdatedV5 activeTickets
+// payload into the ticket cache. Malformed entries (wrong pubkey length) are
+// logged and skipped; the remaining tickets replace the prior set atomically.
+func (s *Service) replaceTicketCache(active []*TicketInfoV1) {
+	out := make([]ticketcache.Replacement, 0, len(active))
+	for _, t := range active {
+		if t == nil {
+			continue
+		}
+		if len(t.BLSPubkey) != ticketcache.PubkeyLength {
+			log.WithField("ticketId", uint64(t.TicketID)).
+				WithField("pubkeyLen", len(t.BLSPubkey)).
+				Warn("Skipping blob-streaming ticket: unexpected BLS pubkey length")
+			continue
+		}
+		var pubkey [ticketcache.PubkeyLength]byte
+		copy(pubkey[:], t.BLSPubkey)
+		out = append(out, ticketcache.Replacement{
+			ID:               uint64(t.TicketID),
+			SellingTimestamp: uint64(t.SellingBlockTimestamp),
+			Owner:            t.Owner,
+			BLSPubkey:        pubkey,
+			BlobCount:        uint64(t.BlobCount),
+		})
+	}
+	s.ticketCache.Replace(out)
 }

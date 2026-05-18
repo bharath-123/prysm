@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "handlers.go",
+        "handlers_blob_streaming.go",
         "server.go",
         "ssz_query.go",
         "validator_count.go",
@@ -14,6 +15,7 @@ go_library(
         "//api:go_default_library",
         "//api/server/structs:go_default_library",
         "//beacon-chain/blockchain:go_default_library",
+        "//beacon-chain/cache/ticketcache:go_default_library",
         "//beacon-chain/core/helpers:go_default_library",
         "//beacon-chain/db:go_default_library",
         "//beacon-chain/p2p:go_default_library",
@@ -37,6 +39,7 @@ go_library(
         "//proto/ssz_query:go_default_library",
         "//runtime/version:go_default_library",
         "//time/slots:go_default_library",
+        "@com_github_ethereum_go_ethereum//common:go_default_library",
         "@com_github_ethereum_go_ethereum//common/hexutil:go_default_library",
         "@com_github_pkg_errors//:go_default_library",
     ],
@@ -45,6 +48,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "handlers_blob_streaming_test.go",
         "handlers_test.go",
         "ssz_query_test.go",
         "validator_count_test.go",
@@ -54,6 +58,7 @@ go_test(
         "//api:go_default_library",
         "//api/server/structs:go_default_library",
         "//beacon-chain/blockchain/testing:go_default_library",
+        "//beacon-chain/cache/ticketcache:go_default_library",
         "//beacon-chain/core/helpers:go_default_library",
         "//beacon-chain/db/testing:go_default_library",
         "//beacon-chain/forkchoice/doubly-linked-tree:go_default_library",
@@ -81,6 +86,7 @@ go_test(
         "//testing/require:go_default_library",
         "//testing/util:go_default_library",
         "//time/slots:go_default_library",
+        "@com_github_ethereum_go_ethereum//common:go_default_library",
         "@com_github_ethereum_go_ethereum//common/hexutil:go_default_library",
         "@com_github_prysmaticlabs_go_bitfield//:go_default_library",
     ],
