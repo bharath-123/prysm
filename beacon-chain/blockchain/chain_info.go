@@ -122,6 +122,7 @@ type FinalizationFetcher interface {
 	InForkchoice([32]byte) bool
 	IsFinalized(ctx context.Context, blockRoot [32]byte) bool
 	ParentPayloadReady(interfaces.ReadOnlyBeaconBlock) bool
+	ParentPayloadGasLimit(ctx context.Context, parentBlockRoot [32]byte) (uint64, error)
 }
 
 // OptimisticModeFetcher retrieves information about optimistic status of the node.
@@ -411,6 +412,47 @@ func (s *Service) InForkchoice(root [32]byte) bool {
 	return s.cfg.ForkChoiceStore.HasNode(root)
 }
 
+// ParentPayloadGasLimit returns the gas limit committed by the block at
+// parentBlockRoot: bid.gas_limit for Gloas, payload header for pre-Gloas (the
+// Fulu→Gloas boundary case).
+func (s *Service) ParentPayloadGasLimit(ctx context.Context, parentBlockRoot [32]byte) (uint64, error) {
+	s.headLock.RLock()
+	if s.hasHeadState() && s.head.root == parentBlockRoot {
+		gasLimit, err := payloadGasLimit(s.head.block)
+		s.headLock.RUnlock()
+		return gasLimit, err
+	}
+	s.headLock.RUnlock()
+
+	blk, err := s.cfg.BeaconDB.Block(ctx, parentBlockRoot)
+	if err != nil {
+		return 0, errors.Wrap(err, "could not get parent block")
+	}
+	if blk == nil || blk.IsNil() {
+		return 0, errors.New("parent block not found")
+	}
+	return payloadGasLimit(blk)
+}
+
+func payloadGasLimit(blk interfaces.ReadOnlySignedBeaconBlock) (uint64, error) {
+	body := blk.Block().Body()
+	if blk.Version() >= version.Gloas {
+		signedBid, err := body.SignedExecutionPayloadBid()
+		if err != nil {
+			return 0, errors.Wrap(err, "could not get signed execution payload bid")
+		}
+		if signedBid == nil || signedBid.Message == nil {
+			return 0, errors.New("parent block missing execution payload bid")
+		}
+		return signedBid.Message.GasLimit, nil
+	}
+	payload, err := body.Execution()
+	if err != nil {
+		return 0, errors.Wrap(err, "could not get execution payload")
+	}
+	return payload.GasLimit(), nil
+}
+
 // ParentPayloadReady returns true if the block's parent payload is available
 // in forkchoice. For pre-Gloas blocks or blocks building on empty, this always
 // returns true. For blocks building on full, it checks that the full node
@@ -506,11 +548,23 @@ func (s *Service) IsOptimisticForRoot(ctx context.Context, root [32]byte) (bool,
 	return !isCanonical, nil
 }
 
-// DependentRootForEpoch wraps the corresponding method in forkchoice
+// DependentRootForEpoch wraps the corresponding method in forkchoice. The
+// genesis-era underflow (slot < 2 epochs) is handled by falling back to the
+// origin block root so callers don't have to special-case it.
 func (s *Service) DependentRootForEpoch(root [32]byte, epoch primitives.Epoch) ([32]byte, error) {
+	if epoch == 0 {
+		return s.originBlockRoot, nil
+	}
 	s.cfg.ForkChoiceStore.RLock()
 	defer s.cfg.ForkChoiceStore.RUnlock()
-	return s.cfg.ForkChoiceStore.DependentRootForEpoch(root, epoch)
+	depRoot, err := s.cfg.ForkChoiceStore.DependentRootForEpoch(root, epoch)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	if depRoot == [32]byte{} {
+		return s.originBlockRoot, nil
+	}
+	return depRoot, nil
 }
 
 // TargetRootForEpoch wraps the corresponding method in forkchoice

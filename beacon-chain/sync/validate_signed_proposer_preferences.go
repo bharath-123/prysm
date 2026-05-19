@@ -3,8 +3,7 @@ package sync
 import (
 	"context"
 
-	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed"
-	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/operation"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/transition"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/p2p"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
@@ -60,12 +59,22 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 
 	dependentRoot := bytesutil.ToBytes32(signedPreferences.Message.DependentRoot)
 	// [IGNORE] block with root preferences.dependent_root has been seen.
-	if !s.cfg.chain.InForkchoice(dependentRoot) && !s.cfg.beaconDB.HasBlock(ctx, dependentRoot) {
-		return pubsub.ValidationIgnore, errors.New("dependent_root block not seen yet")
+	seen := func(root [32]byte) bool {
+		return s.cfg.chain.InForkchoice(root) || s.cfg.beaconDB.HasBlock(ctx, root)
+	}
+	if err := v.VerifyDependentRootSeen(seen); err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+
+	slot := signedPreferences.Message.ProposalSlot
+	// [IGNORE] dedup on (dependent_root, proposal_slot) before the checkpoint
+	// state load so byte-mutated duplicates can't amplify state work.
+	if s.proposerPreferencesCache.Has(dependentRoot, slot) {
+		return pubsub.ValidationIgnore, nil
 	}
 
 	// Checkpoint state at epoch(proposal_slot)-1 anchored to dependent_root.
-	proposalEpoch := slots.ToEpoch(signedPreferences.Message.ProposalSlot)
+	proposalEpoch := slots.ToEpoch(slot)
 	// Underflow at epoch 0 collapses to epoch 0 — the spec's genesis-adjacent fallback.
 	dependentEpoch, _ := proposalEpoch.SafeSub(1)
 	boundarySlot, err := slots.EpochStart(dependentEpoch)
@@ -73,12 +82,16 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 		return pubsub.ValidationIgnore, errors.Wrap(err, "compute checkpoint boundary slot")
 	}
 	var st state.ReadOnlyBeaconState
-	// NextSlotState may return a state at slot < boundarySlot when the
-	// dependent block was at an earlier slot (empty boundary slot); only use it
-	// if it lands exactly on the boundary, otherwise fall through to load+advance.
-	if cached := transition.NextSlotState(dependentRoot[:], boundarySlot); cached != nil && cached.Slot() == boundarySlot {
-		st = cached
-	} else {
+	// NextSlotState is only worth probing for next-epoch preferences whose
+	// boundary lands on the current epoch start (head still in prev epoch);
+	// for current-epoch preferences the boundary is older and the 2-slot
+	// cache will miss.
+	if proposalEpoch > slots.ToEpoch(s.cfg.clock.CurrentSlot()) {
+		if cached := transition.NextSlotState(dependentRoot[:], boundarySlot); cached != nil && cached.Slot() == boundarySlot {
+			st = cached
+		}
+	}
+	if st == nil {
 		loaded, err := s.cfg.stateGen.StateByRootNoCopy(ctx, dependentRoot)
 		if err != nil {
 			return pubsub.ValidationIgnore, errors.Wrap(err, "load checkpoint state")
@@ -96,26 +109,18 @@ func (s *Service) validateSignedProposerPreferencesGossip(ctx context.Context, p
 		return pubsub.ValidationReject, err
 	}
 
-	slot := signedPreferences.Message.ProposalSlot
-	valIdx := signedPreferences.Message.ValidatorIndex
-	// [IGNORE] dedup on (dependent_root, proposal_slot); validator_index is implied.
-	if s.proposerPreferencesCache.Has(dependentRoot, slot) {
-		return pubsub.ValidationIgnore, nil
-	}
 	// [REJECT] signed_proposer_preferences.signature is valid with respect to the
 	// validator's public key.
 	if err := v.VerifySignature(st); err != nil {
 		return pubsub.ValidationReject, err
 	}
 
-	s.proposerPreferencesCache.Add(dependentRoot, slot, valIdx, signedPreferences.Message.FeeRecipient, signedPreferences.Message.GasLimit)
-	s.cfg.operationNotifier.OperationFeed().Send(&feed.Event{
-		Type: operation.ProposerPreferencesReceived,
-		Data: &operation.ProposerPreferencesReceivedData{
-			SignedProposerPreferences: signedPreferences,
-		},
-	})
-
+	s.proposerPreferencesCache.Add(cache.ProposerPreference{
+		DependentRoot:  dependentRoot,
+		ValidatorIndex: signedPreferences.Message.ValidatorIndex,
+		FeeRecipient:   bytesutil.ToBytes20(signedPreferences.Message.FeeRecipient),
+		TargetGasLimit: signedPreferences.Message.TargetGasLimit,
+	}, slot)
 	msg.ValidatorData = signedPreferences
 	return pubsub.ValidationAccept, nil
 }

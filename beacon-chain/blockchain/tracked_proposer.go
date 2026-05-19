@@ -8,15 +8,12 @@ import (
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 )
 
-// proposerPreference looks up the cached preference for (slot, valIdx) anchored
-// to the dependent_root derived from the given state. Underflow at genesis-
-// adjacent slots is treated as a cache miss; those slots never carry Gloas
-// preferences anyway.
+// proposerPreference looks up the cached preference for (slot, valIdx).
 func (s *Service) proposerPreference(st state.ReadOnlyBeaconState, slot primitives.Slot, valIdx primitives.ValidatorIndex) (cache.TrackedValidator, bool) {
 	if s.cfg.ProposerPreferencesCache == nil {
 		return cache.TrackedValidator{}, false
 	}
-	dependentRoot, err := helpers.ProposerDependentRoot(st, slot)
+	dependentRoot, err := st.ProposerDependentRoot(slot)
 	if err != nil {
 		return cache.TrackedValidator{}, false
 	}
@@ -27,9 +24,7 @@ func (s *Service) proposerPreference(st state.ReadOnlyBeaconState, slot primitiv
 	if pref.ValidatorIndex != valIdx {
 		return cache.TrackedValidator{}, false
 	}
-	var feeRecipient primitives.ExecutionAddress
-	copy(feeRecipient[:], pref.FeeRecipient)
-	return cache.TrackedValidator{Active: true, FeeRecipient: feeRecipient, GasLimit: pref.GasLimit}, true
+	return cache.TrackedValidator{Active: true, FeeRecipient: pref.FeeRecipient, GasLimit: pref.TargetGasLimit}, true
 }
 
 // trackedProposer returns whether the beacon node was informed, via the

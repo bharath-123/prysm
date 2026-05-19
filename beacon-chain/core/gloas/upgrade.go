@@ -308,7 +308,7 @@ func upgradeToGloas(beaconState state.BeaconState) (state.BeaconState, error) {
 		}
 	}
 
-	emptyExecutionRequestsRoot, err := (&enginev1.ExecutionRequests{}).HashTreeRoot()
+	emptyExecutionRequestsRoot, err := enginev1.EmptyExecutionRequestsHashTreeRoot()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute empty execution requests root")
 	}
@@ -344,6 +344,7 @@ func upgradeToGloas(beaconState state.BeaconState) (state.BeaconState, error) {
 		NextSyncCommittee:           nextSyncCommittee,
 		LatestExecutionPayloadBid: &ethpb.ExecutionPayloadBid{
 			BlockHash:             payloadHeader.BlockHash(),
+			GasLimit:              payloadHeader.GasLimit(),
 			FeeRecipient:          make([]byte, fieldparams.FeeRecipientLength),
 			ParentBlockHash:       make([]byte, fieldparams.RootLength),
 			ParentBlockRoot:       make([]byte, fieldparams.RootLength),

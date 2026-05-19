@@ -19,6 +19,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/config/params"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
+	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/testing/require"
 	"github.com/OffchainLabs/prysm/v7/testing/util"
@@ -103,9 +104,9 @@ func TestValidateExecutionPayloadBidGossip_ErrorPathsWithMock(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:      "gas limit mismatch",
-			verifier:  mockExecutionPayloadBidVerifier{errGasLimitMismatch: errors.New("wrong gas limit")},
-			result:    pubsub.ValidationReject,
+			name:      "gas limit incompatible",
+			verifier:  mockExecutionPayloadBidVerifier{errGasLimitIncompatible: errors.New("incompatible gas limit")},
+			result:    pubsub.ValidationIgnore,
 			wantError: true,
 		},
 		{
@@ -239,17 +240,17 @@ func TestValidateExecutionPayloadBidGossip_FeeRecipientMismatch(t *testing.T) {
 	require.ErrorIs(t, err, verification.ErrBidFeeRecipientMismatch)
 }
 
-func TestValidateExecutionPayloadBidGossip_GasLimitMismatch(t *testing.T) {
+func TestValidateExecutionPayloadBidGossip_GasLimitIncompatible(t *testing.T) {
 	ctx := context.Background()
 	s, msg, _ := setupExecutionPayloadBidService(t)
 	s.newExecutionPayloadBidVerifier = testNewExecutionPayloadBidVerifier(
-		mockExecutionPayloadBidVerifier{errGasLimitMismatch: verification.ErrBidGasLimitMismatch},
+		mockExecutionPayloadBidVerifier{errGasLimitIncompatible: verification.ErrBidGasLimitIncompatible},
 	)
 
 	result, err := s.validateExecutionPayloadBidGossip(ctx, "", msg)
 	require.NotNil(t, err)
-	require.Equal(t, pubsub.ValidationReject, result)
-	require.ErrorIs(t, err, verification.ErrBidGasLimitMismatch)
+	require.Equal(t, pubsub.ValidationIgnore, result)
+	require.ErrorIs(t, err, verification.ErrBidGasLimitIncompatible)
 }
 
 func TestExecutionPayloadBidSubscriber_WrongMessage(t *testing.T) {
@@ -284,7 +285,7 @@ type mockExecutionPayloadBidVerifier struct {
 	errBuilderActive        error
 	errExecutionPayment     error
 	errFeeRecipientMismatch error
-	errGasLimitMismatch     error
+	errGasLimitIncompatible error
 	errParentBlockRootSeen  error
 	errParentBlockHash      error
 	errBuilderCanCoverBid   error
@@ -309,8 +310,8 @@ func (m *mockExecutionPayloadBidVerifier) VerifyFeeRecipientMatches([]byte) erro
 	return m.errFeeRecipientMismatch
 }
 
-func (m *mockExecutionPayloadBidVerifier) VerifyGasLimitMatches(uint64) error {
-	return m.errGasLimitMismatch
+func (m *mockExecutionPayloadBidVerifier) VerifyGasLimitTargetCompatible(uint64, uint64) error {
+	return m.errGasLimitIncompatible
 }
 
 func (m *mockExecutionPayloadBidVerifier) VerifyParentBlockRootSeen(func([32]byte) bool) error {
@@ -352,8 +353,8 @@ func setupExecutionPayloadBidService(t *testing.T) (*Service, *pubsub.Message, *
 	p := p2ptest.NewTestP2P(t)
 
 	// Save a genesis block so beaconDB.GenesisBlockRoot resolves; bids at slot 1
-	// (epoch 0) hit the underflow branch in proposerDependentRoot which falls
-	// back to the genesis block root.
+	// (epoch 0) hit the underflow branch in chain.DependentRootForEpoch which
+	// falls back to the genesis block root.
 	gb := util.NewBeaconBlock()
 	signedGenesis, err := blocks.NewSignedBeaconBlock(gb)
 	require.NoError(t, err)
@@ -367,8 +368,9 @@ func setupExecutionPayloadBidService(t *testing.T) (*Service, *pubsub.Message, *
 	signedBid := util.GenerateTestSignedExecutionPayloadBid(1)
 	signedBid.Message.BuilderIndex = 1
 	chainService := &mock.ChainService{
-		Genesis: time.Now(),
-		State:   state,
+		Genesis:    time.Now(),
+		State:      state,
+		TargetRoot: genesisRoot,
 		ForkchoiceRoots: map[[32]byte]bool{
 			[32]byte{0x02}: true,
 		},
@@ -388,7 +390,12 @@ func setupExecutionPayloadBidService(t *testing.T) (*Service, *pubsub.Message, *
 	}
 	// The Gloas test state has a zero-filled proposer lookahead, so the
 	// proposer for any slot is validator index 0.
-	require.Equal(t, true, s.proposerPreferencesCache.Add(genesisRoot, signedBid.Message.Slot, 0, signedBid.Message.FeeRecipient, signedBid.Message.GasLimit))
+	require.Equal(t, true, s.proposerPreferencesCache.Add(cache.ProposerPreference{
+		DependentRoot:  genesisRoot,
+		ValidatorIndex: 0,
+		FeeRecipient:   bytesutil.ToBytes20(signedBid.Message.FeeRecipient),
+		TargetGasLimit: signedBid.Message.GasLimit,
+	}, signedBid.Message.Slot))
 	msg := executionPayloadBidToPubsub(t, s, p, signedBid)
 	return s, msg, signedBid
 }

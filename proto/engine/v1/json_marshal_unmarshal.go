@@ -129,7 +129,11 @@ func (e *ExecutionBlock) UnmarshalJSON(enc []byte) error {
 	e.Hash = common.BytesToHash(decodedHash)
 	e.TotalDifficulty, _ = decoded["totalDifficulty"].(string)
 
-	if balStr, ok := decoded["blockAccessList"].(string); ok {
+	if raw, exists := decoded["blockAccessList"]; exists && raw != nil {
+		balStr, ok := raw.(string)
+		if !ok {
+			return errors.New("expected `blockAccessList` field to be a string")
+		}
 		balBytes, err := hexutil.Decode(balStr)
 		if err != nil {
 			return errors.Wrap(err, "could not decode blockAccessList hex")
@@ -824,6 +828,7 @@ type payloadAttributesV4JSON struct {
 	Withdrawals           []*Withdrawal  `json:"withdrawals"`
 	ParentBeaconBlockRoot hexutil.Bytes  `json:"parentBeaconBlockRoot"`
 	SlotNumber            hexutil.Uint64 `json:"slotNumber"`
+	TargetGasLimit        hexutil.Uint64 `json:"targetGasLimit"`
 }
 
 func (p *PayloadAttributesV4) MarshalJSON() ([]byte, error) {
@@ -839,6 +844,7 @@ func (p *PayloadAttributesV4) MarshalJSON() ([]byte, error) {
 		Withdrawals:           withdrawals,
 		ParentBeaconBlockRoot: p.ParentBeaconBlockRoot,
 		SlotNumber:            hexutil.Uint64(p.SlotNumber),
+		TargetGasLimit:        hexutil.Uint64(p.TargetGasLimit),
 	})
 }
 
@@ -858,6 +864,7 @@ func (p *PayloadAttributesV4) UnmarshalJSON(enc []byte) error {
 	p.Withdrawals = withdrawals
 	p.ParentBeaconBlockRoot = dec.ParentBeaconBlockRoot
 	p.SlotNumber = uint64(dec.SlotNumber)
+	p.TargetGasLimit = uint64(dec.TargetGasLimit)
 	return nil
 }
 

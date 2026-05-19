@@ -64,12 +64,11 @@ func (s *Service) validateExecutionPayloadBidGossip(ctx context.Context, pid pee
 	if err != nil {
 		return pubsub.ValidationIgnore, err
 	}
-	// [IGNORE] matching SignedProposerPreferences seen, where dependent_root =
-	// get_proposer_dependent_root(parent_state, epoch(bid.slot)) =
-	// parent_state.block_roots[start_slot(epoch(bid.slot)-1) - 1]. Underflow
-	// (bid.slot in epoch 0 or 1) is treated as the genesis block root.
+	// [IGNORE] matching SignedProposerPreferences seen, keyed on the proposer
+	// dep root anchored to bid.parent_block_root.
 	parentBlockRoot := bid.ParentBlockRoot()
-	dependentRoot, err := s.proposerDependentRoot(ctx, parentBlockRoot, bid.Slot())
+	priorEpoch, _ := slots.ToEpoch(bid.Slot()).SafeSub(1)
+	dependentRoot, err := s.cfg.chain.DependentRootForEpoch(parentBlockRoot, priorEpoch)
 	if err != nil {
 		return pubsub.ValidationIgnore, err
 	}
@@ -86,11 +85,7 @@ func (s *Service) validateExecutionPayloadBidGossip(ctx context.Context, pid pee
 		return pubsub.ValidationReject, err
 	}
 	// [REJECT] bid.fee_recipient matches the fee_recipient from the proposer's SignedProposerPreferences associated with bid.slot.
-	if err := v.VerifyFeeRecipientMatches(pref.FeeRecipient); err != nil {
-		return pubsub.ValidationReject, err
-	}
-	// [REJECT] bid.gas_limit matches the gas_limit from the proposer's SignedProposerPreferences associated with bid.slot.
-	if err := v.VerifyGasLimitMatches(pref.GasLimit); err != nil {
+	if err := v.VerifyFeeRecipientMatches(pref.FeeRecipient[:]); err != nil {
 		return pubsub.ValidationReject, err
 	}
 	// The spec lists signature validation later, but the "first signed bid seen
@@ -113,8 +108,16 @@ func (s *Service) validateExecutionPayloadBidGossip(ctx context.Context, pid pee
 	if err := v.VerifyBuilderCanCoverBid(st); err != nil {
 		return pubsub.ValidationIgnore, err
 	}
-	// [IGNORE] bid.parent_block_hash is the block hash of a known execution payload in fork choice.
+	// [IGNORE] bid.parent_block_hash is the block hash of a known execution payload in fork choice
+	// and bid.gas_limit is compatible with parent_gas_limit and the proposer's target.
 	if err := v.VerifyParentBlockHash(s.cfg.chain.BlockHash); err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+	parentGasLimit, err := s.cfg.chain.ParentPayloadGasLimit(ctx, parentBlockRoot)
+	if err != nil {
+		return pubsub.ValidationIgnore, err
+	}
+	if err := v.VerifyGasLimitTargetCompatible(parentGasLimit, pref.TargetGasLimit); err != nil {
 		return pubsub.ValidationIgnore, err
 	}
 	// [IGNORE] bid.parent_block_root is the hash tree root of a known beacon block in fork choice.
