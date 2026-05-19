@@ -337,7 +337,7 @@ func operationEventsFixtures(t *testing.T) (*topicRequest, []*feed.Event) {
 						ProposalSlot:   32,
 						ValidatorIndex: 123,
 						FeeRecipient:   make([]byte, fieldparams.FeeRecipientLength),
-						GasLimit:       30000000,
+						TargetGasLimit: 30000000,
 					},
 					Signature: make([]byte, fieldparams.BLSSignatureLength),
 				},
@@ -499,6 +499,9 @@ func TestStreamEvents_OperationsEvents(t *testing.T) {
 			getState                  func() state.BeaconState
 			getBlock                  func() interfaces.SignedBeaconBlock
 			SetTrackedValidatorsCache func(*cache.TrackedValidatorsCache)
+			// makeEventData overrides the default event data for forks (e.g. Gloas) where
+			// the head block does not carry an embedded execution payload.
+			makeEventData func(headRoot [32]byte, currentSlot primitives.Slot) payloadattribute.EventData
 		}
 		testCases := []testCase{
 			{
@@ -557,6 +560,27 @@ func TestStreamEvents_OperationsEvents(t *testing.T) {
 						Active:       true,
 						Index:        0,
 						FeeRecipient: primitives.ExecutionAddress(common.HexToAddress("0xd2DBd02e4efe087d7d195de828b9Dd25f19A89C9").Bytes()),
+					})
+				},
+			},
+			{
+				name: "gloas",
+				getState: func() state.BeaconState {
+					st, err := util.NewBeaconStateGloas()
+					require.NoError(t, err)
+					return st
+				},
+				getBlock: func() interfaces.SignedBeaconBlock {
+					b, err := blocks.NewSignedBeaconBlock(util.HydrateSignedBeaconBlockGloas(&eth.SignedBeaconBlockGloas{}))
+					require.NoError(t, err)
+					return b
+				},
+				SetTrackedValidatorsCache: func(c *cache.TrackedValidatorsCache) {
+					c.Set(cache.TrackedValidator{
+						Active:       true,
+						Index:        0,
+						FeeRecipient: primitives.ExecutionAddress(common.HexToAddress("0xd2DBd02e4efe087d7d195de828b9Dd25f19A89C9").Bytes()),
+						GasLimit:     30000000,
 					})
 				},
 			},

@@ -930,6 +930,21 @@ func marshalAttributes(attr payloadattribute.Attributer) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get parent beacon block root from payload attributes event")
 	}
+	if v >= version.Gloas {
+		v4, err := attr.PbV4()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get V4 payload attributes")
+		}
+		return json.Marshal(&structs.PayloadAttributesV4{
+			Timestamp:             timestamp,
+			PrevRandao:            prevRandao,
+			SuggestedFeeRecipient: feeRecpt,
+			Withdrawals:           withdrawals,
+			ParentBeaconBlockRoot: hexutil.Encode(parentRoot),
+			SlotNumber:            strconv.FormatUint(v4.SlotNumber, 10),
+			TargetGasLimit:        strconv.FormatUint(v4.TargetGasLimit, 10),
+		})
+	}
 	return json.Marshal(&structs.PayloadAttributesV3{
 		Timestamp:             timestamp,
 		PrevRandao:            prevRandao,
