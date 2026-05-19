@@ -3,12 +3,9 @@ package validator
 import (
 	"context"
 
-<<<<<<< HEAD
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/operation"
-=======
-	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
->>>>>>> d6648d3ed7b0ca6cb0e35bc243f323cc151a92c9
 	fieldparams "github.com/OffchainLabs/prysm/v7/config/fieldparams"
 	"github.com/OffchainLabs/prysm/v7/config/params"
 	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
@@ -67,7 +64,6 @@ func (vs *Server) SubmitSignedProposerPreferences(
 			)
 		}
 
-		valIdx := msg.Message.ValidatorIndex
 		currentSlot := vs.TimeFetcher.CurrentSlot()
 		if proposalSlot <= currentSlot {
 			return nil, status.Errorf(

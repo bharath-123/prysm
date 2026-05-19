@@ -2982,7 +2982,7 @@ func ProposerPreferencesFromConsensus(p *eth.ProposerPreferences) *ProposerPrefe
 		ProposalSlot:   fmt.Sprintf("%d", p.ProposalSlot),
 		ValidatorIndex: fmt.Sprintf("%d", p.ValidatorIndex),
 		FeeRecipient:   hexutil.Encode(p.FeeRecipient),
-		GasLimit:       fmt.Sprintf("%d", p.GasLimit),
+		GasLimit:       fmt.Sprintf("%d", p.TargetGasLimit),
 	}
 }
 

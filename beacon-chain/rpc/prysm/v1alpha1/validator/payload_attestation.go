@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-<<<<<<< HEAD
-=======
 	"time"
->>>>>>> d6648d3ed7b0ca6cb0e35bc243f323cc151a92c9
 
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed"
 	opfeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/operation"
