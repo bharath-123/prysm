@@ -326,10 +326,13 @@ func (s *Service) ForkchoiceUpdated(
 		if features.Get().EnableHezeTicketCache {
 			method = ForkchoiceUpdatedMethodV5
 		}
+		log.WithField("method", method).WithField("hezeFlag", features.Get().EnableHezeTicketCache).Info("BHARATH FCU(Gloas): dispatching to EL")
 		err = s.rpcClient.CallContext(ctx, result, method, state, a)
 		if err != nil {
+			log.WithField("method", method).WithError(err).Error("BHARATH FCU(Gloas): error dispatching to EL")
 			return nil, nil, handleRPCError(err)
 		}
+		log.WithField("method", method).WithField("activeTickets", len(result.ActiveTickets)).WithField("cacheWired", s.ticketCache != nil).Info("BHARATH FCU(Gloas): EL responded")
 		if s.ticketCache != nil && method == ForkchoiceUpdatedMethodV5 {
 			s.replaceTicketCache(result.ActiveTickets)
 		}
@@ -1372,4 +1375,5 @@ func (s *Service) replaceTicketCache(active []*TicketInfoV1) {
 		})
 	}
 	s.ticketCache.Replace(out)
+	log.WithField("received", len(active)).WithField("cached", len(out)).Info("BHARATH replaceTicketCache: replaced ticket cache from FCUv5")
 }
