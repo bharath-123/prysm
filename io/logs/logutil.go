@@ -29,6 +29,13 @@ const (
 	LogTargetUser             HookIdentifier = "user"
 )
 
+// SetLoggingLevel sets the global logrus level without vmodule data.
+// The ephemeral log file always receives at least debug-level logs.
+func SetLoggingLevel(level logrus.Level) {
+	userVerbosity = level
+	logrus.SetLevel(max(level, ephemeralLogFileVerbosity))
+}
+
 // SetLoggingLevelAndData sets the base logging level for logrus.
 func SetLoggingLevelAndData(baseVerbosity logrus.Level, vmoduleMap map[string]logrus.Level, maxVmoduleLevel logrus.Level, disableEphemeral bool) {
 	userVerbosity = baseVerbosity
