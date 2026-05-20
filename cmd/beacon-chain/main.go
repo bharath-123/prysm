@@ -125,7 +125,6 @@ var appFlags = []cli.Flag{
 	cmd.ClearDB,
 	cmd.ForceClearDB,
 	cmd.LogFormat,
-	cmd.DisableLogColor,
 	cmd.MaxGoroutines,
 	debug.PProfFlag,
 	debug.PProfAddrFlag,
@@ -189,8 +188,8 @@ func before(ctx *cli.Context) error {
 		return errors.Wrap(err, "failed to parse log vmodule")
 	}
 
-	// set the global logging level and data
-	logs.SetLoggingLevelAndData(verbosityLevel, vmodule, maxLevel, ctx.Bool(flags.DisableEphemeralLogFile.Name))
+	// set the global logging level to allow for the highest verbosity requested
+	logs.SetLoggingLevel(max(verbosityLevel, maxLevel))
 
 	format := ctx.String(cmd.LogFormat.Name)
 	switch format {
@@ -204,7 +203,6 @@ func before(ctx *cli.Context) error {
 		formatter.FullTimestamp = true
 		formatter.ForceFormatting = true
 		formatter.ForceColors = true
-		formatter.DisableColors = ctx.Bool(cmd.DisableLogColor.Name)
 		formatter.VModule = vmodule
 		formatter.BaseVerbosity = verbosityLevel
 
@@ -212,7 +210,6 @@ func before(ctx *cli.Context) error {
 			Formatter:     formatter,
 			Writer:        os.Stderr,
 			AllowedLevels: logrus.AllLevels[:max(verbosityLevel, maxLevel)+1],
-			Identifier:    logs.LogTargetUser,
 		})
 	case "fluentd":
 		// disabling logrus default output so we can control it via hooks

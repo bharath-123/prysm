@@ -127,7 +127,6 @@ func (c *Cache) targetSlotLocked(sellingTimestamp uint64) primitives.Slot {
 	if c.genesis.IsZero() {
 		return 0
 	}
-	// lint:ignore uintcast -- Unix timestamps fit comfortably in int64.
-	at := slots.At(c.genesis, time.Unix(int64(sellingTimestamp), 0))
+	at := slots.At(c.genesis, time.Unix(int64(sellingTimestamp), 0)) // lint:ignore uintcast -- Unix timestamps fit comfortably in int64.
 	return at + 1
 }
