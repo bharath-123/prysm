@@ -199,7 +199,7 @@ func TestClient_GetHeader(t *testing.T) {
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
 
-		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.ErrorIs(t, err, ErrNotOK)
 	})
 	t.Run("header not available", func(t *testing.T) {
@@ -217,7 +217,7 @@ func TestClient_GetHeader(t *testing.T) {
 			hc:      hc,
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
-		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.ErrorIs(t, err, ErrNoContent)
 	})
 	t.Run("bellatrix", func(t *testing.T) {
@@ -236,7 +236,7 @@ func TestClient_GetHeader(t *testing.T) {
 			hc:      hc,
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedSig := ezDecode(t, "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505")
 		require.Equal(t, true, bytes.Equal(expectedSig, h.Signature()))
@@ -282,7 +282,7 @@ func TestClient_GetHeader(t *testing.T) {
 			baseURL:    &url.URL{Host: "localhost:3500", Scheme: "http"},
 			sszEnabled: true,
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedSig := ezDecode(t, "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505")
 		require.Equal(t, true, bytes.Equal(expectedSig, h.Signature()))
@@ -318,7 +318,7 @@ func TestClient_GetHeader(t *testing.T) {
 			hc:      hc,
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedWithdrawalsRoot := ezDecode(t, "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2")
 		bid, err := h.Message()
@@ -360,7 +360,7 @@ func TestClient_GetHeader(t *testing.T) {
 			baseURL:    &url.URL{Host: "localhost:3500", Scheme: "http"},
 			sszEnabled: true,
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedWithdrawalsRoot := ezDecode(t, "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2")
 		bid, err := h.Message()
@@ -392,7 +392,7 @@ func TestClient_GetHeader(t *testing.T) {
 			hc:      hc,
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedWithdrawalsRoot := ezDecode(t, "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2")
 		bid, err := h.Message()
@@ -442,7 +442,7 @@ func TestClient_GetHeader(t *testing.T) {
 			baseURL:    &url.URL{Host: "localhost:3500", Scheme: "http"},
 			sszEnabled: true,
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedWithdrawalsRoot := ezDecode(t, "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2")
 		bid, err := h.Message()
@@ -481,7 +481,7 @@ func TestClient_GetHeader(t *testing.T) {
 			hc:      hc,
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
-		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), []byte{})
 		require.ErrorContains(t, "could not convert ExecHeaderResponseDeneb to proto: too many blob commitments: 7", err)
 	})
 	t.Run("electra", func(t *testing.T) {
@@ -500,7 +500,7 @@ func TestClient_GetHeader(t *testing.T) {
 			hc:      hc,
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedWithdrawalsRoot := ezDecode(t, "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2")
 		bid, err := h.Message()
@@ -555,7 +555,7 @@ func TestClient_GetHeader(t *testing.T) {
 			baseURL:    &url.URL{Host: "localhost:3500", Scheme: "http"},
 			sszEnabled: true,
 		}
-		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		h, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.NoError(t, err)
 		expectedWithdrawalsRoot := ezDecode(t, "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2")
 		bid, err := h.Message()
@@ -599,7 +599,7 @@ func TestClient_GetHeader(t *testing.T) {
 			hc:      hc,
 			baseURL: &url.URL{Host: "localhost:3500", Scheme: "http"},
 		}
-		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey))
+		_, err := c.GetHeader(ctx, slot, bytesutil.ToBytes32(parentHash), bytesutil.ToBytes48(pubkey), nil)
 		require.ErrorContains(t, "unsupported header version", err)
 	})
 }

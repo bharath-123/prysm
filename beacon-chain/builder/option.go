@@ -31,6 +31,12 @@ func FlagOptions(c *cli.Context) ([]Option, error) {
 	opts := []Option{
 		WithBuilderClient(client),
 	}
+	// When using a builder, use the validator client's default HTTP URL for X-Request-Auth signing
+	// (validator connects to beacon; for POC we assume validator at default port on same host).
+	if endpoint != "" {
+		defaultValidatorURL := "http://127.0.0.1:7500"
+		opts = append(opts, WithGetHeaderAuthSigner(NewHTTPGetHeaderAuthSigner(defaultValidatorURL)))
+	}
 	return opts, nil
 }
 
@@ -62,6 +68,15 @@ func WithDatabase(beaconDB db.HeadAccessDatabase) Option {
 func WithRegistrationCache() Option {
 	return func(s *Service) error {
 		s.registrationCache = cache.NewRegistrationCache()
+		return nil
+	}
+}
+
+// WithGetHeaderAuthSigner sets the signer used to produce the X-Request-Auth header for GetHeader requests.
+// When set, the returned signature is sent as X-Request-Auth (hex-encoded). When nil, no header is sent.
+func WithGetHeaderAuthSigner(signer GetHeaderAuthSigner) Option {
+	return func(s *Service) error {
+		s.cfg.getHeaderAuthSigner = signer
 		return nil
 	}
 }

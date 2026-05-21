@@ -3,6 +3,7 @@ package builder
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -100,7 +101,7 @@ var _ observer = &requestLogger{}
 // BuilderClient provides a collection of helper methods for calling Builder API endpoints.
 type BuilderClient interface {
 	NodeURL() string
-	GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubkey [48]byte) (SignedBid, error)
+	GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubkey [48]byte, authSignature []byte) (SignedBid, error)
 	RegisterValidator(ctx context.Context, svr []*ethpb.SignedValidatorRegistrationV1) error
 	SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlySignedBeaconBlock) (interfaces.ExecutionData, v1.BlobsBundler, error)
 	SubmitBlindedBlockPostFulu(ctx context.Context, sb interfaces.ReadOnlySignedBeaconBlock) error
@@ -224,22 +225,28 @@ func execHeaderPath(slot primitives.Slot, parentHash [32]byte, pubkey [48]byte) 
 }
 
 // GetHeader is used by a proposing validator to request an execution payload header from the Builder node.
-func (c *Client) GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubkey [48]byte) (SignedBid, error) {
+// authSignature is optional; when non-nil it is sent as the X-Request-Auth header (hex-encoded).
+func (c *Client) GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubkey [48]byte, authSignature []byte) (SignedBid, error) {
 	path, err := execHeaderPath(slot, parentHash, pubkey)
 	if err != nil {
 		return nil, err
 	}
-	var getOpts reqOption
+	opts := []reqOption{}
 	if c.sszEnabled {
-		getOpts = func(r *http.Request) {
+		opts = append(opts, func(r *http.Request) {
 			r.Header.Set("Accept", api.OctetStreamMediaType)
-		}
+		})
 	} else {
-		getOpts = func(r *http.Request) {
+		opts = append(opts, func(r *http.Request) {
 			r.Header.Set("Accept", api.JsonMediaType)
-		}
+		})
 	}
-	data, header, err := c.do(ctx, http.MethodGet, path, nil, http.StatusOK, getOpts)
+	if len(authSignature) > 0 {
+		opts = append(opts, func(r *http.Request) {
+			r.Header.Set(XRequestAuthHeader, hex.EncodeToString(authSignature))
+		})
+	}
+	data, header, err := c.do(ctx, http.MethodGet, path, nil, http.StatusOK, opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting header from builder server")
 	}

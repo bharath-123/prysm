@@ -198,6 +198,7 @@ func (s *Server) InitializeRoutes() error {
 	s.router.HandleFunc("GET /eth/v1/validator/{pubkey}/graffiti", s.GetGraffiti)
 	s.router.HandleFunc("POST /eth/v1/validator/{pubkey}/graffiti", s.SetGraffiti)
 	s.router.HandleFunc("DELETE /eth/v1/validator/{pubkey}/graffiti", s.DeleteGraffiti)
+	s.router.HandleFunc("POST /eth/v1/validator/sign_get_header_auth", s.SignGetHeaderAuth)
 
 	// auth endpoint
 	s.router.HandleFunc("GET "+api.WebUrlPrefix+"initialize", s.Initialize)
