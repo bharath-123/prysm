@@ -620,7 +620,7 @@ type ProposerPreferences struct {
 	ProposalSlot   string `json:"proposal_slot"`
 	ValidatorIndex string `json:"validator_index"`
 	FeeRecipient   string `json:"fee_recipient"`
-	GasLimit       string `json:"gas_limit"`
+	TargetGasLimit string `json:"target_gas_limit"`
 }
 
 type SignedProposerPreferences struct {
