@@ -4080,3 +4080,131 @@ func (b *BlobsBundleV2) HashTreeRootWith(hh *ssz.Hasher) (err error) {
 	hh.Merkleize(indx)
 	return
 }
+
+// MarshalSSZ ssz marshals the AOTBlobInfo object
+func (a *AOTBlobInfo) MarshalSSZ() ([]byte, error) {
+	return ssz.MarshalSSZ(a)
+}
+
+// MarshalSSZTo ssz marshals the AOTBlobInfo object to a target array
+func (a *AOTBlobInfo) MarshalSSZTo(buf []byte) (dst []byte, err error) {
+	dst = buf
+	offset := int(20)
+
+	// Field (0) 'TicketId'
+	dst = ssz.MarshalUint(dst, a.TicketId)
+
+	// Field (1) 'TargetSlot'
+	dst = ssz.MarshalUint(dst, a.TargetSlot)
+
+	// Offset (2) 'BlobKzgCommitments'
+	dst = ssz.WriteOffset(dst, offset)
+	offset += len(a.BlobKzgCommitments) * 48
+
+	// Field (2) 'BlobKzgCommitments'
+	if size := len(a.BlobKzgCommitments); size > 4096 {
+		err = ssz.ErrListTooBigFn("--.BlobKzgCommitments", size, 4096)
+		return
+	}
+	for ii := 0; ii < len(a.BlobKzgCommitments); ii++ {
+		if size := len(a.BlobKzgCommitments[ii]); size != 48 {
+			err = ssz.ErrBytesLengthFn("--.BlobKzgCommitments[ii]", size, 48)
+			return
+		}
+		dst = append(dst, a.BlobKzgCommitments[ii]...)
+	}
+
+	return
+}
+
+// UnmarshalSSZ ssz unmarshals the AOTBlobInfo object
+func (a *AOTBlobInfo) UnmarshalSSZ(buf []byte) error {
+	var err error
+	size := uint64(len(buf))
+	if size < 20 {
+		return ssz.ErrSize
+	}
+
+	tail := buf
+	var o2 uint64
+
+	// Field (0) 'TicketId'
+	a.TicketId = ssz.UnmarshallUint[uint64](buf[0:8])
+
+	// Field (1) 'TargetSlot'
+	a.TargetSlot = ssz.UnmarshallUint[github_com_OffchainLabs_prysm_v7_consensus_types_primitives.Slot](buf[8:16])
+
+	// Offset (2) 'BlobKzgCommitments'
+	if o2 = ssz.ReadOffset(buf[16:20]); o2 > size {
+		return ssz.ErrOffset
+	}
+
+	if o2 != 20 {
+		return ssz.ErrInvalidVariableOffset
+	}
+
+	// Field (2) 'BlobKzgCommitments'
+	{
+		buf = tail[o2:]
+		num, err := ssz.DivideInt2(len(buf), 48, 4096)
+		if err != nil {
+			return err
+		}
+		a.BlobKzgCommitments = make([][]byte, num)
+		for ii := 0; ii < num; ii++ {
+			if cap(a.BlobKzgCommitments[ii]) == 0 {
+				a.BlobKzgCommitments[ii] = make([]byte, 0, len(buf[ii*48:(ii+1)*48]))
+			}
+			a.BlobKzgCommitments[ii] = append(a.BlobKzgCommitments[ii], buf[ii*48:(ii+1)*48]...)
+		}
+	}
+	return err
+}
+
+// SizeSSZ returns the ssz encoded size in bytes for the AOTBlobInfo object
+func (a *AOTBlobInfo) SizeSSZ() (size int) {
+	size = 20
+
+	// Field (2) 'BlobKzgCommitments'
+	size += len(a.BlobKzgCommitments) * 48
+
+	return
+}
+
+// HashTreeRoot ssz hashes the AOTBlobInfo object
+func (a *AOTBlobInfo) HashTreeRoot() ([32]byte, error) {
+	return ssz.HashWithDefaultHasher(a)
+}
+
+// HashTreeRootWith ssz hashes the AOTBlobInfo object with a hasher
+func (a *AOTBlobInfo) HashTreeRootWith(hh *ssz.Hasher) (err error) {
+	indx := hh.Index()
+
+	// Field (0) 'TicketId'
+	ssz.PutUint(hh, a.TicketId)
+
+	// Field (1) 'TargetSlot'
+	ssz.PutUint(hh, a.TargetSlot)
+
+	// Field (2) 'BlobKzgCommitments'
+	{
+		if size := len(a.BlobKzgCommitments); size > 4096 {
+			err = ssz.ErrListTooBigFn("--.BlobKzgCommitments", size, 4096)
+			return
+		}
+		subIndx := hh.Index()
+		for _, i := range a.BlobKzgCommitments {
+			if len(i) != 48 {
+				err = ssz.ErrBytesLength
+				return
+			}
+			hh.PutBytes(i)
+		}
+
+		numItems := uint64(len(a.BlobKzgCommitments))
+		hh.MerkleizeWithMixin(subIndx, numItems, 4096)
+	}
+
+	hh.Merkleize(indx)
+	return
+}
