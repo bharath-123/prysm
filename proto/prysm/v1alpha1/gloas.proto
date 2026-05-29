@@ -62,6 +62,15 @@ message ExecutionPayloadBid {
     (ethereum.eth.ext.ssz_max) = "max_blob_commitments.size"
   ];
   bytes execution_requests_root = 12 [ (ethereum.eth.ext.ssz_size) = "32" ];
+  // aot_blob_kzg_commitments_roots holds one Root per AOT ticket referenced by the block. Each Root =
+  // hash_tree_root(ticket.kzg_commitments), i.e. the HTR of an AOTDataColumnSidecar's kzg_commitments
+  // list, which is the cache key the DA check uses to address staged AOT columns.
+  // [New in Heze:EIP-blob-streaming] Added alongside (not replacing) blob_kzg_commitments, which
+  // continues to serve as the JIT commitment list. Spec name: aot_blob_kzg_commitments_roots.
+  repeated bytes aot_blob_kzg_commitments_roots = 13 [
+    (ethereum.eth.ext.ssz_size) = "?,32",
+    (ethereum.eth.ext.ssz_max) = "max_aot_blob_commitments.size"
+  ];
 }
 
 // SignedExecutionPayloadBid wraps an execution payload bid with a signature.
