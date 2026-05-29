@@ -196,6 +196,7 @@ ssz_fulu_objs = [
 ]
 
 ssz_gloas_objs = [
+    "AOTDataColumnSidecar",
     "BlindedExecutionPayloadEnvelope",
     "BuilderPendingPayment",
     "BuilderPendingWithdrawal",

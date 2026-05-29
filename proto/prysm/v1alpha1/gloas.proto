@@ -480,6 +480,46 @@ message DataColumnSidecarGloas {
   bytes beacon_block_root = 6 [ (ethereum.eth.ext.ssz_size) = "32" ];
 }
 
+// AOTDataColumnSidecar carries a single data column for an AOT (ahead-of-time)
+// blob submission, introduced by the Blob Streaming EIP. It is propagated on the
+// `aot_data_column_sidecar_{subnet_id}` subnet by ticket holders ahead of block
+// time. Unlike DataColumnSidecarGloas (the merged, block-bound stored form), this
+// sidecar carries its own kzg_commitments plus the ticket identity (ticket_id,
+// target_slot) and the BLS signature over the original AOTBlobInfo.
+// Note: defined here in gloas.proto (rather than a new heze.proto) to avoid the
+// hard-fork proto boilerplate.
+//
+// Spec:
+// class AOTDataColumnSidecar(Container):
+//     index: ColumnIndex
+//     column: List[Cell, MAX_AOT_BLOB_COMMITMENTS_PER_BLOCK]
+//     kzg_commitments: List[KZGCommitment, MAX_AOT_BLOB_COMMITMENTS_PER_BLOCK]
+//     kzg_proofs: List[KZGProof, MAX_AOT_BLOB_COMMITMENTS_PER_BLOCK]
+//     ticket_id: TicketId
+//     target_slot: Slot
+//     blob_info_signature: BLSSignature
+message AOTDataColumnSidecar {
+  uint64 index = 1;
+  repeated bytes column = 2 [
+    (ethereum.eth.ext.ssz_size) = "?,bytes_per_cell.size",
+    (ethereum.eth.ext.ssz_max) = "max_aot_blob_commitments.size"
+  ];
+  repeated bytes kzg_commitments = 3 [
+    (ethereum.eth.ext.ssz_size) = "?,48",
+    (ethereum.eth.ext.ssz_max) = "max_aot_blob_commitments.size"
+  ];
+  repeated bytes kzg_proofs = 4 [
+    (ethereum.eth.ext.ssz_size) = "?,48",
+    (ethereum.eth.ext.ssz_max) = "max_aot_blob_commitments.size"
+  ];
+  uint64 ticket_id = 5;
+  uint64 target_slot = 6 [
+    (ethereum.eth.ext.cast_type) =
+        "github.com/OffchainLabs/prysm/v7/consensus-types/primitives.Slot"
+  ];
+  bytes blob_info_signature = 7 [ (ethereum.eth.ext.ssz_size) = "96" ];
+}
+
 // ExecutionPayloadEnvelope wraps an execution payload with builder index.
 // This is used in the Gloas fork to associate execution payloads with their
 // builders and provide additional context needed for payload processing.
