@@ -37,7 +37,7 @@ type AotDataColumnsIdent struct {
 	Indices []uint64
 }
 
-// aotDataColumnCache stages AOTDataColumnSidecars received via gossip ahead of
+// AotDataColumnCache stages AOTDataColumnSidecars received via gossip ahead of
 // block time. Columns are grouped into bundles keyed by aotBundleKey (the HTR of
 // the bundle's KZG commitment list). It is a transient, pre-block holding area:
 // once the block/envelope arrives the relevant columns are merged into the standard
@@ -47,7 +47,7 @@ type AotDataColumnsIdent struct {
 // ticket_id is deliberately NOT used as a key: it is only a gossip-propagation
 // construct and is not observable on-chain. The bid references AOT bundles solely by
 // their commitment-list roots.
-type aotDataColumnCache struct {
+type AotDataColumnCache struct {
 	mu      sync.RWMutex
 	bundles map[aotBundleKey]*aotBundle
 	feed    *event.Feed
@@ -61,8 +61,8 @@ type aotBundle struct {
 	columns     map[uint64]*ethpb.AOTDataColumnSidecar
 }
 
-func newAotDataColumnCache() *aotDataColumnCache {
-	return &aotDataColumnCache{
+func NewAotDataColumnCache() *AotDataColumnCache {
+	return &AotDataColumnCache{
 		bundles: make(map[aotBundleKey]*aotBundle),
 		feed:    new(event.Feed),
 	}
@@ -83,7 +83,7 @@ func aotBundleKeyFor(sidecar *ethpb.AOTDataColumnSidecar) (aotBundleKey, error) 
 // stash adds an AOT data column sidecar to the cache, grouped by its bundle key, and
 // notifies subscribers with the indices seen so far for that bundle. Re-stashing the
 // same (bundle, index) overwrites the previous entry.
-func (c *aotDataColumnCache) stash(sidecar *ethpb.AOTDataColumnSidecar) error {
+func (c *AotDataColumnCache) Stash(sidecar *ethpb.AOTDataColumnSidecar) error {
 	index := sidecar.GetIndex()
 	if index >= fieldparams.NumberOfColumns {
 		return errors.Wrapf(errAotColumnIndexTooHigh, "index=%d", index)
@@ -128,7 +128,7 @@ func (c *aotDataColumnCache) stash(sidecar *ethpb.AOTDataColumnSidecar) error {
 // The caller must call subscription.Unsubscribe when done and drain the channel
 // promptly: a stash buffers a value, and if the buffer is full the stash (and other
 // subscribers) block until it can be delivered.
-func (c *aotDataColumnCache) Subscribe() (event.Subscription, <-chan AotDataColumnsIdent) {
+func (c *AotDataColumnCache) Subscribe() (event.Subscription, <-chan AotDataColumnsIdent) {
 	identsChan := make(chan AotDataColumnsIdent, 1)
 	subscription := c.feed.Subscribe(identsChan)
 	return subscription, identsChan
@@ -137,7 +137,7 @@ func (c *aotDataColumnCache) Subscribe() (event.Subscription, <-chan AotDataColu
 // get returns the staged AOT columns for the given bundle key and indices. If the
 // bundle is unknown or any requested index is missing, it returns an error and no
 // columns (the returned slice is left untouched so callers can ignore it on error).
-func (c *aotDataColumnCache) get(key aotBundleKey, indices []uint64) ([]*ethpb.AOTDataColumnSidecar, error) {
+func (c *AotDataColumnCache) get(key aotBundleKey, indices []uint64) ([]*ethpb.AOTDataColumnSidecar, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -160,7 +160,7 @@ func (c *aotDataColumnCache) get(key aotBundleKey, indices []uint64) ([]*ethpb.A
 
 // storedIndices returns the set of column indices currently staged for a bundle, or
 // nil if the bundle is unknown.
-func (c *aotDataColumnCache) storedIndices(key aotBundleKey) map[uint64]bool {
+func (c *AotDataColumnCache) storedIndices(key aotBundleKey) map[uint64]bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -177,7 +177,7 @@ func (c *aotDataColumnCache) storedIndices(key aotBundleKey) map[uint64]bool {
 
 // evict removes a bundle from the cache, e.g. after its columns have been merged
 // into the block-root store.
-func (c *aotDataColumnCache) evict(key aotBundleKey) {
+func (c *AotDataColumnCache) evict(key aotBundleKey) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.bundles, key)
@@ -185,7 +185,7 @@ func (c *aotDataColumnCache) evict(key aotBundleKey) {
 
 // prune drops bundles whose target slot is more than aotBundleRetentionSlots in the
 // past relative to currentSlot.
-func (c *aotDataColumnCache) prune(currentSlot primitives.Slot) {
+func (c *AotDataColumnCache) prune(currentSlot primitives.Slot) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for key, bundle := range c.bundles {

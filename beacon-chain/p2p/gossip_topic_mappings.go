@@ -25,6 +25,7 @@ var gossipTopicMappings = map[string]func() proto.Message{
 	LightClientOptimisticUpdateTopicFormat:    func() proto.Message { return &ethpb.LightClientOptimisticUpdateAltair{} },
 	LightClientFinalityUpdateTopicFormat:      func() proto.Message { return &ethpb.LightClientFinalityUpdateAltair{} },
 	DataColumnSubnetTopicFormat:               func() proto.Message { return &ethpb.DataColumnSidecar{} },
+	AotDataColumnSubnetTopicFormat:            func() proto.Message { return &ethpb.AOTDataColumnSidecar{} },
 	PayloadAttestationMessageTopicFormat:      func() proto.Message { return &ethpb.PayloadAttestationMessage{} },
 	ExecutionPayloadEnvelopeTopicFormat:       func() proto.Message { return &ethpb.SignedExecutionPayloadEnvelope{} },
 	ExecutionPayloadBidTopicFormat:            func() proto.Message { return &ethpb.SignedExecutionPayloadBid{} },
@@ -95,6 +96,11 @@ func GossipTopicMappings(topic string, epoch primitives.Epoch) proto.Message {
 	case DataColumnSubnetTopicFormat:
 		if epoch >= params.BeaconConfig().GloasForkEpoch {
 			return &ethpb.DataColumnSidecarGloas{}
+		}
+		return gossipMessage(topic)
+	case AotDataColumnSubnetTopicFormat:
+		if epoch >= params.BeaconConfig().GloasForkEpoch {
+			return &ethpb.AOTDataColumnSidecar{}
 		}
 		return gossipMessage(topic)
 	default:

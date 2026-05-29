@@ -24,13 +24,13 @@ func aotTestSidecar(index uint64, targetSlot primitives.Slot, commitments [][]by
 }
 
 func TestAotDataColumnCache_StashAndGet(t *testing.T) {
-	c := newAotDataColumnCache()
+	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(1), aotTestCommitment(2)}
 	key, err := ssz.KzgCommitmentsRoot(commits)
 	require.NoError(t, err)
 
-	require.NoError(t, c.stash(aotTestSidecar(0, 10, commits)))
-	require.NoError(t, c.stash(aotTestSidecar(7, 10, commits)))
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commits)))
+	require.NoError(t, c.Stash(aotTestSidecar(7, 10, commits)))
 
 	got, err := c.get(key, []uint64{0, 7})
 	require.NoError(t, err)
@@ -46,31 +46,31 @@ func TestAotDataColumnCache_StashAndGet(t *testing.T) {
 }
 
 func TestAotDataColumnCache_StashIndexTooHigh(t *testing.T) {
-	c := newAotDataColumnCache()
+	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(1)}
-	err := c.stash(aotTestSidecar(fieldparams.NumberOfColumns, 10, commits))
+	err := c.Stash(aotTestSidecar(fieldparams.NumberOfColumns, 10, commits))
 	require.ErrorIs(t, err, errAotColumnIndexTooHigh)
 }
 
 func TestAotDataColumnCache_StoredIndices(t *testing.T) {
-	c := newAotDataColumnCache()
+	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(3)}
 	key, err := ssz.KzgCommitmentsRoot(commits)
 	require.NoError(t, err)
 
-	require.NoError(t, c.stash(aotTestSidecar(0, 10, commits)))
-	require.NoError(t, c.stash(aotTestSidecar(3, 10, commits)))
-	require.NoError(t, c.stash(aotTestSidecar(5, 10, commits)))
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commits)))
+	require.NoError(t, c.Stash(aotTestSidecar(3, 10, commits)))
+	require.NoError(t, c.Stash(aotTestSidecar(5, 10, commits)))
 
 	stored := c.storedIndices(key)
 	require.DeepEqual(t, map[uint64]bool{0: true, 3: true, 5: true}, stored)
 
 	// Unknown bundle returns nil.
-	require.DeepEqual(t, map[uint64]bool(nil),c.storedIndices([32]byte{0xab}))
+	require.DeepEqual(t, map[uint64]bool(nil), c.storedIndices([32]byte{0xab}))
 }
 
 func TestAotDataColumnCache_GroupsByCommitmentsRoot(t *testing.T) {
-	c := newAotDataColumnCache()
+	c := NewAotDataColumnCache()
 	commitsA := [][]byte{aotTestCommitment(1), aotTestCommitment(2)}
 	commitsB := [][]byte{aotTestCommitment(9)}
 	keyA, err := ssz.KzgCommitmentsRoot(commitsA)
@@ -80,15 +80,15 @@ func TestAotDataColumnCache_GroupsByCommitmentsRoot(t *testing.T) {
 	require.Equal(t, false, keyA == keyB)
 
 	// Same column index, different bundles, must not collide.
-	require.NoError(t, c.stash(aotTestSidecar(0, 10, commitsA)))
-	require.NoError(t, c.stash(aotTestSidecar(0, 10, commitsB)))
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commitsA)))
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commitsB)))
 
 	require.DeepEqual(t, map[uint64]bool{0: true}, c.storedIndices(keyA))
 	require.DeepEqual(t, map[uint64]bool{0: true}, c.storedIndices(keyB))
 }
 
 func TestAotDataColumnCache_StashOverwrite(t *testing.T) {
-	c := newAotDataColumnCache()
+	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(4)}
 	key, err := ssz.KzgCommitmentsRoot(commits)
 	require.NoError(t, err)
@@ -97,8 +97,8 @@ func TestAotDataColumnCache_StashOverwrite(t *testing.T) {
 	second := aotTestSidecar(0, 10, commits)
 	second.BlobInfoSignature = bytesutil.PadTo([]byte{0xee}, 96)
 
-	require.NoError(t, c.stash(first))
-	require.NoError(t, c.stash(second))
+	require.NoError(t, c.Stash(first))
+	require.NoError(t, c.Stash(second))
 
 	got, err := c.get(key, []uint64{0})
 	require.NoError(t, err)
@@ -107,14 +107,14 @@ func TestAotDataColumnCache_StashOverwrite(t *testing.T) {
 }
 
 func TestAotDataColumnCache_Evict(t *testing.T) {
-	c := newAotDataColumnCache()
+	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(6)}
 	key, err := ssz.KzgCommitmentsRoot(commits)
 	require.NoError(t, err)
 
-	require.NoError(t, c.stash(aotTestSidecar(0, 10, commits)))
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commits)))
 	c.evict(key)
-	require.DeepEqual(t, map[uint64]bool(nil),c.storedIndices(key))
+	require.DeepEqual(t, map[uint64]bool(nil), c.storedIndices(key))
 
 	// Evicting an unknown key is a no-op.
 	c.evict([32]byte{0x01})
@@ -126,17 +126,17 @@ func TestAotDataColumnCache_Prune(t *testing.T) {
 	require.NoError(t, err)
 
 	// targetSlot=10, retention=2 → kept while currentSlot <= 12, dropped at 13.
-	c := newAotDataColumnCache()
-	require.NoError(t, c.stash(aotTestSidecar(0, 10, commits)))
+	c := NewAotDataColumnCache()
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commits)))
 	c.prune(12)
 	require.DeepEqual(t, map[uint64]bool{0: true}, c.storedIndices(key))
 
 	c.prune(13)
-	require.DeepEqual(t, map[uint64]bool(nil),c.storedIndices(key))
+	require.DeepEqual(t, map[uint64]bool(nil), c.storedIndices(key))
 }
 
 func TestAotDataColumnCache_SubscribeNotifiesOnStash(t *testing.T) {
-	c := newAotDataColumnCache()
+	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(8)}
 	key, err := ssz.KzgCommitmentsRoot(commits)
 	require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestAotDataColumnCache_SubscribeNotifiesOnStash(t *testing.T) {
 	sub, ch := c.Subscribe()
 	defer sub.Unsubscribe()
 
-	require.NoError(t, c.stash(aotTestSidecar(2, 10, commits)))
+	require.NoError(t, c.Stash(aotTestSidecar(2, 10, commits)))
 
 	ident := <-ch
 	require.Equal(t, key, ident.CommitmentsRoot)

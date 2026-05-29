@@ -46,6 +46,11 @@ const (
 	GossipLightClientOptimisticUpdateMessage = "light_client_optimistic_update"
 	// GossipDataColumnSidecarMessage is the name for the data column sidecar message type.
 	GossipDataColumnSidecarMessage = "data_column_sidecar"
+	// GossipAotDataColumnSidecarMessage is the name for the ahead-of-time (AOT) data column
+	// sidecar message type (blob streaming). Note: this string contains
+	// GossipDataColumnSidecarMessage as a substring, so any strings.Contains check against the
+	// JIT message name must order the AOT case first.
+	GossipAotDataColumnSidecarMessage = "aot_data_column_sidecar"
 	// GossipPayloadAttestationMessageMessage is the name for the payload attestation message type.
 	GossipPayloadAttestationMessageMessage = "payload_attestation_message"
 	// GossipExecutionPayloadEnvelopeMessage is the name for the execution payload envelope message type.
@@ -83,6 +88,8 @@ const (
 	LightClientOptimisticUpdateTopicFormat = GossipProtocolAndDigest + GossipLightClientOptimisticUpdateMessage
 	// DataColumnSubnetTopicFormat is the topic format for the data column subnet.
 	DataColumnSubnetTopicFormat = GossipProtocolAndDigest + GossipDataColumnSidecarMessage + "_%d"
+	// AotDataColumnSubnetTopicFormat is the topic format for the AOT data column subnet.
+	AotDataColumnSubnetTopicFormat = GossipProtocolAndDigest + GossipAotDataColumnSidecarMessage + "_%d"
 	// PayloadAttestationMessageTopicFormat is the topic format for payload attestation messages.
 	PayloadAttestationMessageTopicFormat = GossipProtocolAndDigest + GossipPayloadAttestationMessageMessage
 	// ExecutionPayloadEnvelopeTopicFormat is the topic format for execution payload envelopes.

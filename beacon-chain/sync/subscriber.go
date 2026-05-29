@@ -332,6 +332,21 @@ func (s *Service) registerSubscribers(nse params.NetworkScheduleEntry) bool {
 		})
 	}
 
+	// AOT data column gossip topic (blob streaming, Gloas onwards).
+	if params.BeaconConfig().GloasForkEpoch <= nse.Epoch {
+		s.spawn(func() {
+			s.subscribeWithParameters(subscribeParameters{
+				topicFormat: p2p.AotDataColumnSubnetTopicFormat,
+				validate:    s.validateAotDataColumn,
+				handle:      s.aotDataColumnSubscriber,
+				nse:         nse,
+				// AOT columns share the JIT data column subnet mapping, so the node joins the
+				// AOT subnets matching the columns it custodies.
+				getSubnetsToJoin: s.dataColumnSubnetIndices,
+			})
+		})
+	}
+
 	// New gossip topic in Gloas.
 	if params.BeaconConfig().GloasForkEpoch <= nse.Epoch {
 		s.spawn(func() {

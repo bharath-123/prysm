@@ -183,6 +183,15 @@ func WithDataColumnStorage(b *filesystem.DataColumnStorage) Option {
 	}
 }
 
+// WithAotDataColumnCache gives the sync package the AOT data column staging cache that the
+// aot_data_column_sidecar gossip subscriber writes validated sidecars into.
+func WithAotDataColumnCache(c aotColumnStasher) Option {
+	return func(s *Service) error {
+		s.cfg.aotDataColumnCache = c
+		return nil
+	}
+}
+
 // WithVerifierWaiter gives the sync package direct access to the verifier waiter.
 func WithVerifierWaiter(v *verification.InitializerWaiter) Option {
 	return func(s *Service) error {

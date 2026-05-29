@@ -114,6 +114,7 @@ type config struct {
 	stateNotifier           statefeed.Notifier
 	blobStorage             *filesystem.BlobStorage
 	dataColumnStorage       *filesystem.DataColumnStorage
+	aotDataColumnCache      aotColumnStasher
 	batchVerifierLimit      int
 	payloadAttestationPool  payloadattestation.PoolManager
 }

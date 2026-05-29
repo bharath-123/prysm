@@ -106,6 +106,7 @@ type BeaconNode struct {
 	blsToExecPool            blstoexec.PoolManager
 	depositCache             cache.DepositCache
 	ticketCache              *ticketcache.Cache
+	AotDataColumnCache       *das.AotDataColumnCache
 	trackedValidatorsCache   *cache.TrackedValidatorsCache
 	proposerPreferencesCache *cache.ProposerPreferencesCache
 	payloadIDCache           *cache.PayloadIDCache
@@ -173,6 +174,7 @@ func New(cliCtx *cli.Context, cancel context.CancelFunc, optFuncs []func(*cli.Co
 		syncCommitteePool:      synccommittee.NewPool(),
 		blsToExecPool:          blstoexec.NewPool(),
 		ticketCache:            ticketcache.New(time.Time{}),
+		AotDataColumnCache:     das.NewAotDataColumnCache(),
 		trackedValidatorsCache: cache.NewTrackedValidatorsCache(),
 		// TODO(gloas): revisit whether trackedValidatorsCache and
 		// proposerPreferencesCache should remain separate. The tracked
@@ -883,6 +885,7 @@ func (b *BeaconNode) registerSyncService(initialSyncComplete chan struct{}, bFil
 		regularsync.WithStateNotifier(b),
 		regularsync.WithBlobStorage(b.BlobStorage),
 		regularsync.WithDataColumnStorage(b.DataColumnStorage),
+		regularsync.WithAotDataColumnCache(b.AotDataColumnCache),
 		regularsync.WithVerifierWaiter(b.verifyInitWaiter),
 		regularsync.WithAvailableBlocker(bFillStore),
 		regularsync.WithTrackedValidatorsCache(b.trackedValidatorsCache),

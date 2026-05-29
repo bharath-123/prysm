@@ -42,6 +42,10 @@ func (s *Service) decodePubsubMessage(msg *pubsub.Message) (ssz.Unmarshaler, err
 		topic = p2p.GossipTypeMapping[reflect.TypeFor[*ethpb.SyncCommitteeMessage]()]
 	case strings.Contains(topic, p2p.GossipBlobSidecarMessage):
 		topic = p2p.GossipTypeMapping[reflect.TypeFor[*ethpb.BlobSidecar]()]
+	case strings.Contains(topic, p2p.GossipAotDataColumnSidecarMessage):
+		// Must precede the JIT data column case: "aot_data_column_sidecar" contains
+		// "data_column_sidecar" as a substring.
+		topic = p2p.GossipTypeMapping[reflect.TypeFor[*ethpb.AOTDataColumnSidecar]()]
 	case strings.Contains(topic, p2p.GossipDataColumnSidecarMessage):
 		topic = p2p.GossipTypeMapping[reflect.TypeFor[*ethpb.DataColumnSidecar]()]
 	}
