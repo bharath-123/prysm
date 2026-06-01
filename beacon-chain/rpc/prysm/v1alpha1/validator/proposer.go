@@ -283,6 +283,10 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 				return nil, status.Errorf(codes.Internal, "Could not set execution data: %v", err)
 			}
 		} else {
+			// Smoke test: query external builders for execution payload bids and
+			// log them. The bids are not yet used for block construction.
+			vs.logBuilderExecutionPayloadBids(ctx, sBlk, head, local)
+
 			selfBuildOnly := local.OverrideBuilder || skipMevBoost
 			selfBuildEnvelope, err = vs.setExecutionPayloadBid(ctx, sBlk, local, selfBuildOnly)
 			if err != nil {

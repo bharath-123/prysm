@@ -27,4 +27,18 @@ var (
 			Buckets: []float64{1, 2, 5, 10, 20, 50, 100, 200, 500, 1000},
 		},
 	)
+	getExecutionPayloadBidLatency = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "get_execution_payload_bid_latency_milliseconds",
+			Help:    "Captures RPC latency for getExecutionPayloadBid (Gloas) in milliseconds",
+			Buckets: []float64{1, 2, 5, 10, 20, 50, 100, 200, 500, 1000},
+		},
+	)
+	submitBeaconBlockLatency = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "submit_beacon_block_latency_milliseconds",
+			Help:    "Captures RPC latency for submitSignedBeaconBlock (Gloas) in milliseconds",
+			Buckets: []float64{1, 2, 5, 10, 20, 50, 100, 200, 500, 1000},
+		},
+	)
 )

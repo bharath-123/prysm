@@ -27,6 +27,8 @@ type BlockBuilder interface {
 	SubmitBlindedBlock(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) (interfaces.ExecutionData, v1.BlobsBundler, error)
 	SubmitBlindedBlockPostFulu(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) error
 	GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubKey [48]byte) (builder.SignedBid, error)
+	GetExecutionPayloadBid(ctx context.Context, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error)
+	SubmitBeaconBlock(ctx context.Context, builderURL string, block interfaces.ReadOnlySignedBeaconBlock) error
 	RegisterValidator(ctx context.Context, reg []*ethpb.SignedValidatorRegistrationV1) error
 	RegistrationByValidatorID(ctx context.Context, id primitives.ValidatorIndex) (*ethpb.ValidatorRegistrationV1, error)
 	Configured() bool
@@ -34,15 +36,17 @@ type BlockBuilder interface {
 
 // config defines a config struct for dependencies into the service.
 type config struct {
-	builderClient builder.BuilderClient
-	beaconDB      db.HeadAccessDatabase
-	headFetcher   blockchain.HeadFetcher
+	builderClient      builder.BuilderClient
+	multiBuilderClient builder.MultiBuilderClient
+	beaconDB           db.HeadAccessDatabase
+	headFetcher        blockchain.HeadFetcher
 }
 
 // Service defines a service that provides a client for interacting with the beacon chain and MEV relay network.
 type Service struct {
 	cfg               *config
 	c                 builder.BuilderClient
+	mc                builder.MultiBuilderClient
 	ctx               context.Context
 	cancel            context.CancelFunc
 	registrationCache *cache.RegistrationCache
@@ -73,12 +77,17 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 				"Builder-constructed blocks or fallback blocks may get orphaned. Use at your own risk!")
 		}
 	}
+	if s.cfg.multiBuilderClient != nil && !reflect.ValueOf(s.cfg.multiBuilderClient).IsNil() {
+		s.mc = s.cfg.multiBuilderClient
+		log.WithField("endpoints", s.mc.NodeURLs()).Info("Gloas builders have been configured")
+	}
 	return s, nil
 }
 
 // Start initializes the service.
 func (s *Service) Start() {
 	go s.pollRelayerStatus(s.ctx)
+	go s.pollBuilderStatus(s.ctx)
 }
 
 // Stop halts the service.
@@ -134,6 +143,41 @@ func (s *Service) GetHeader(ctx context.Context, slot primitives.Slot, parentHas
 	h, err := s.c.GetHeader(ctx, slot, parentHash, pubKey)
 	tracing.AnnotateError(span, err)
 	return h, err
+}
+
+// GetExecutionPayloadBid requests execution payload bids from the configured
+// Gloas builders for the given (slot, parentHash, parentRoot, proposer pubkey)
+// tuple and returns the bids that were served successfully.
+func (s *Service) GetExecutionPayloadBid(ctx context.Context, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
+	ctx, span := trace.StartSpan(ctx, "builder.GetExecutionPayloadBid")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		getExecutionPayloadBidLatency.Observe(float64(time.Since(start).Milliseconds()))
+	}()
+	if s.mc == nil {
+		tracing.AnnotateError(span, ErrNoBuilder)
+		return nil, ErrNoBuilder
+	}
+
+	bids, err := s.mc.GetExecutionPayloadBid(ctx, slot, parentHash, parentRoot, pubKey)
+	tracing.AnnotateError(span, err)
+	return bids, err
+}
+
+// SubmitBeaconBlock submits the signed beacon block back to the single Gloas
+// builder (identified by builderURL) whose bid was selected for this block.
+func (s *Service) SubmitBeaconBlock(ctx context.Context, builderURL string, b interfaces.ReadOnlySignedBeaconBlock) error {
+	ctx, span := trace.StartSpan(ctx, "builder.SubmitBeaconBlock")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		submitBeaconBlockLatency.Observe(float64(time.Since(start).Milliseconds()))
+	}()
+	if s.mc == nil {
+		return ErrNoBuilder
+	}
+	return s.mc.SubmitBeaconBlock(ctx, builderURL, b)
 }
 
 // Status retrieves the status of the builder relay network.
@@ -221,6 +265,25 @@ func (s *Service) pollRelayerStatus(ctx context.Context) {
 			if s.c != nil {
 				if err := s.c.Status(ctx); err != nil {
 					log.WithError(err).Error("Failed to call relayer status endpoint, perhaps mev-boost or relayers are down")
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// pollBuilderStatus periodically checks the status of the configured Gloas
+// builders.
+func (s *Service) pollBuilderStatus(ctx context.Context) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if s.mc != nil {
+				if err := s.mc.Status(ctx); err != nil {
+					log.WithError(err).Error("Failed to call builder status endpoint, perhaps one or more Gloas builders are down")
 				}
 			}
 		case <-ctx.Done():

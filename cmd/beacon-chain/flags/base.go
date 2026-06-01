@@ -29,6 +29,14 @@ var (
 		Value: "",
 	}
 
+	// BuilderURLs is a comma-separated list of Gloas (post-ePBS) builder HTTP
+	// endpoints the consensus client connects to directly (no MEV-Boost).
+	BuilderURLs = &cli.StringFlag{
+		Name:  "builder-urls",
+		Usage: "Comma-separated list of Gloas (post-ePBS) builder HTTP endpoints to connect to directly, e.g. https://builder-a:18550,https://builder-b:18550",
+		Value: "",
+	}
+
 	// EnableBuilderSSZ enables Builder APIs to send and receive in SSZ format
 	EnableBuilderSSZ = &cli.BoolFlag{
 		Name:    "enable-builder-ssz",

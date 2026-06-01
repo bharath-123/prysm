@@ -2,7 +2,9 @@ package validator
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
 	"github.com/OffchainLabs/prysm/v7/config/params"
 	consensusblocks "github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
@@ -56,6 +58,46 @@ func (vs *Server) setExecutionPayloadBid(
 	}
 
 	return true, nil
+}
+
+// logBuilderExecutionPayloadBids queries the configured external builders for
+// execution payload bids and logs them. It is a smoke test for builder
+// connectivity (e.g. against buildoor); the bids are not yet used for block
+// construction.
+func (vs *Server) logBuilderExecutionPayloadBids(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, local *consensusblocks.GetPayloadResponse) {
+	if vs.BlockBuilder == nil || local == nil || local.ExecutionData == nil {
+		return
+	}
+	log.WithFields(logrus.Fields{
+		"slot": sBlk.Block().Slot(),
+		"parentHash": fmt.Sprintf("%#x", local.ExecutionData.ParentHash()),
+		"parentRoot": fmt.Sprintf("%#x", sBlk.Block().ParentRoot()),
+		"pubkey": fmt.Sprintf("%#x", head.PubkeyAtIndex(sBlk.Block().ProposerIndex())),
+	}).Info("BHARATH: Getting bids from builders")
+	var parentHash [32]byte
+	copy(parentHash[:], local.ExecutionData.ParentHash())
+	parentRoot := sBlk.Block().ParentRoot()
+	pubkey := head.PubkeyAtIndex(sBlk.Block().ProposerIndex())
+
+	bids, err := vs.BlockBuilder.GetExecutionPayloadBid(ctx, sBlk.Block().Slot(), parentHash, parentRoot, pubkey)
+	if err != nil {
+		log.WithError(err).Debug("Could not get execution payload bids from builders")
+		return
+	}
+	log.WithField("count", len(bids)).Info("BHARATH: Fetched execution payload bids from builders")
+	for url, bid := range bids {
+		if bid == nil || bid.Message == nil {
+			continue
+		}
+		log.WithFields(logrus.Fields{
+			"builder":          url,
+			"slot":             bid.Message.Slot,
+			"builderIndex":     bid.Message.BuilderIndex,
+			"value":            bid.Message.Value,
+			"executionPayment": bid.Message.ExecutionPayment,
+			"blockHash":        fmt.Sprintf("%#x", bid.Message.BlockHash),
+		}).Info("BHARATH:Received execution payload bid from builder")
+	}
 }
 
 // winningP2PBid returns a cached P2P bid if one exists and exceeds the local EL value.
