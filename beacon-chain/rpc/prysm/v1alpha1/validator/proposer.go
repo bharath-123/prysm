@@ -253,6 +253,7 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 
 	winningBid := primitives.ZeroWei()
 	selfBuildEnvelope := true
+	var selectedBid *cache.BidType
 	var bundle enginev1.BlobsBundler
 	var local *blocks.GetPayloadResponse
 	if sBlk.Version() >= version.Bellatrix {
@@ -288,22 +289,11 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 			if !selfBuildOnly {
 				builderBids = vs.getBuilderExecutionPayloadBids(ctx, sBlk, head, local)
 			}
-			selectedBid, bidErr := vs.setExecutionPayloadBid(ctx, sBlk, local, selfBuildOnly, builderBids)
-			if bidErr != nil {
-				return nil, status.Errorf(codes.Internal, "Could not set execution data for Gloas: %v", bidErr)
+			selectedBid, err = vs.setExecutionPayloadBid(ctx, sBlk, local, selfBuildOnly, builderBids)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "Could not set execution data for Gloas: %v", err)
 			}
 			selfBuildEnvelope = selectedBid.SelfBuild
-
-			blockHtr, err := sBlk.Block().HashTreeRoot()
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "Could not hash tree root: %v", err)
-			}
-
-			log.WithFields(logrus.Fields{
-				"blockHtr": blockHtr,
-				"selectedBidIsBuilderApiBid": selectedBid.IsBuilderApiBid,
-			}).Info("BHARATH: Setting selected bid in cache")
-			vs.SelectedBidCache.Set(blockHtr, selectedBid)
 		}
 	}
 
@@ -314,6 +304,17 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 		return nil, status.Errorf(codes.Internal, "Could not compute state root: %v", err)
 	}
 	sBlk.SetStateRoot(sr)
+
+	// Cache the selected bid keyed by the final block root (state root now set, so
+	// this matches the root ProposeBeaconBlock computes) so ProposeBeaconBlock can
+	// submit the block back to the winning builder for a Builder-API bid.
+	if sBlk.Version() >= version.Gloas && selectedBid != nil {
+		blockRoot, rootErr := sBlk.Block().HashTreeRoot()
+		if rootErr != nil {
+			return nil, status.Errorf(codes.Internal, "Could not compute block root for selected bid cache: %v", rootErr)
+		}
+		vs.SelectedBidCache.Set(blockRoot, selectedBid)
+	}
 
 	// For Gloas self-build, cache the execution payload envelope now that the block is fully built.
 	if sBlk.Version() >= version.Gloas && selfBuildEnvelope {
@@ -373,20 +374,6 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 		return nil, status.Errorf(codes.Internal, "%s: %v", "handle block failed", err)
 	}
 
-	if block.Version() >= version.Gloas {
-		selectedBid, ok := vs.SelectedBidCache.Get(root)
-		if !ok {
-			return nil, status.Errorf(codes.Internal, "Could not get selected bid: %v", err)
-		}
-
-		if selectedBid.IsBuilderApiBid {
-			log.Info("BHARATH: Submitting beacon block to builder")
-			if err := vs.BlockBuilder.SubmitBeaconBlock(ctx, selectedBid.BuilderUrl, block); err != nil {
-				return nil, status.Errorf(codes.Internal, "Could not submit beacon block: %v", err)
-			}
-		}
-	}
-
 	var wg sync.WaitGroup
 	errChan := make(chan error, 1)
 
@@ -408,6 +395,21 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	if err := <-errChan; err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not broadcast/receive block: %v", err)
+	}
+
+	// For a Gloas block built from a Builder-API bid, submit the signed block back
+	// to the winning builder so it can reveal the execution payload envelope. The
+	// block is already broadcast, so a submission failure is logged, not fatal.
+	if block.Version() >= version.Gloas {
+		if bid, ok := vs.SelectedBidCache.Get(root); ok {
+			vs.SelectedBidCache.Delete(root)
+			if bid.IsBuilderApiBid {
+				log.Info("BHARATH: Submitting beacon block to builder")
+				if err := vs.BlockBuilder.SubmitBeaconBlock(ctx, bid.BuilderUrl, block); err != nil {
+					log.WithError(err).WithField("builder", bid.BuilderUrl).Error("Could not submit beacon block to builder")
+				}
+			}
+		}
 	}
 
 	return &ethpb.ProposeResponse{BlockRoot: root[:]}, nil
