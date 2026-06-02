@@ -10,17 +10,19 @@ import (
 // enough provenance to act on it after the block is proposed. It lives in the
 // cache package (rather than the validator RPC package) so that
 // SelectedBidCache can store it without an import cycle.
+// Fields are ordered to satisfy the maligned analyzer (bools, then pointer,
+// then string).
 type BidType struct {
-	// ExecutionPayloadBid is the selected signed execution payload bid.
-	ExecutionPayloadBid *ethpb.SignedExecutionPayloadBid
-	// IsBuilderApiBid is true when the bid came from a builder via the Builder API.
-	IsBuilderApiBid bool
-	// BuilderUrl is the URL of the builder that served the bid; empty unless
-	// IsBuilderApiBid is true.
-	BuilderUrl string
 	// SelfBuild is true when the proposer is building the payload itself. The
 	// caller uses this to decide whether to store the execution payload envelope.
 	SelfBuild bool
+	// IsBuilderApiBid is true when the bid came from a builder via the Builder API.
+	IsBuilderApiBid bool
+	// ExecutionPayloadBid is the selected signed execution payload bid.
+	ExecutionPayloadBid *ethpb.SignedExecutionPayloadBid
+	// BuilderUrl is the URL of the builder that served the bid; empty unless
+	// IsBuilderApiBid is true.
+	BuilderUrl string
 }
 
 // SelectedBidCache maps a block root to the BidType selected for that block, so

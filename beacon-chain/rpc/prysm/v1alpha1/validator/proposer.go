@@ -379,8 +379,8 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 			return nil, status.Errorf(codes.Internal, "Could not get selected bid: %v", err)
 		}
 
-		log.Info("BHARATH: Submitting beacon block to builder")
 		if selectedBid.IsBuilderApiBid {
+			log.Info("BHARATH: Submitting beacon block to builder")
 			if err := vs.BlockBuilder.SubmitBeaconBlock(ctx, selectedBid.BuilderUrl, block); err != nil {
 				return nil, status.Errorf(codes.Internal, "Could not submit beacon block: %v", err)
 			}
