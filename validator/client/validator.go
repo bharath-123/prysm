@@ -92,6 +92,7 @@ type validator struct {
 	submittedPrefSlots           map[primitives.Slot]bool
 	proposerSettings             *proposer.Settings
 	web3SignerConfig             *remoteweb3signer.SetupConfig
+	builderURLs                  []string
 	startBalances                map[[fieldparams.BLSPubkeyLength]byte]uint64
 	prevEpochBalances            map[[fieldparams.BLSPubkeyLength]byte]uint64
 	blacklistedPubkeys           map[[fieldparams.BLSPubkeyLength]byte]bool

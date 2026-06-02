@@ -433,6 +433,7 @@ func (c *ValidatorClient) registerValidatorService(cliCtx *cli.Context) error {
 		InteropKmConfig:         interopKmConfig,
 		Web3SignerConfig:        web3signerConfig,
 		ProposerSettings:        ps,
+		BuilderURLs:             splitBuilderURLs(cliCtx.String(flags.BuilderURLs.Name)),
 		ValidatorsRegBatchSize:  cliCtx.Int(flags.ValidatorsRegistrationBatchSizeFlag.Name),
 		EnableAPI:               features.Get().EnableWeb || cliCtx.Bool(flags.EnableRPCFlag.Name),
 		LogValidatorPerformance: !cliCtx.Bool(flags.DisablePenaltyRewardLogFlag.Name),
@@ -651,4 +652,17 @@ func parseBeaconApiHeaders(rawHeaders string) map[string][]string {
 		result[key] = append(result[key], value)
 	}
 	return result
+}
+
+// splitBuilderURLs parses a comma-separated list of builder URLs, trimming
+// whitespace and dropping empty entries.
+func splitBuilderURLs(raw string) []string {
+	parts := strings.Split(raw, ",")
+	hosts := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			hosts = append(hosts, s)
+		}
+	}
+	return hosts
 }

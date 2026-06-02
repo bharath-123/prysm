@@ -385,6 +385,13 @@ var (
 		Usage: "Sets gas limit for the builder to use for constructing a payload for all the validators.",
 		Value: fmt.Sprint(params.BeaconConfig().DefaultBuilderGasLimit),
 	}
+	// BuilderURLs is a comma-separated list of Gloas (post-ePBS) builder HTTP
+	// endpoints the validator queries directly when performing proposer duties.
+	BuilderURLs = &cli.StringFlag{
+		Name:  "builder-urls",
+		Usage: "Comma-separated list of Gloas (post-ePBS) builder HTTP endpoints the validator connects to directly when proposing, e.g. https://builder-a:18550,https://builder-b:18550",
+		Value: "",
+	}
 	// ValidatorsRegistrationBatchSizeFlag sets the maximum size for one batch of validator registrations. Use a non-positive value to disable batching.
 	ValidatorsRegistrationBatchSizeFlag = &cli.IntFlag{
 		Name:  "validators-registration-batch-size",

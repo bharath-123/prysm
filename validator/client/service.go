@@ -51,6 +51,7 @@ type ValidatorService struct {
 	interopKeysConfig       *local.InteropKeymanagerConfig
 	web3SignerConfig        *remoteweb3signer.SetupConfig
 	proposerSettings        *proposer.Settings
+	builderURLs             []string
 	maxHealthChecks         int
 	validatorsRegBatchSize  int
 	enableAPI               bool
@@ -84,6 +85,7 @@ type Config struct {
 	InteropKmConfig         *local.InteropKeymanagerConfig
 	Web3SignerConfig        *remoteweb3signer.SetupConfig
 	ProposerSettings        *proposer.Settings
+	BuilderURLs             []string
 	ValidatorsRegBatchSize  int
 	EnableAPI               bool
 	LogValidatorPerformance bool
@@ -110,6 +112,7 @@ func NewValidatorService(ctx context.Context, cfg *Config) (*ValidatorService, e
 		interopKeysConfig:       cfg.InteropKmConfig,
 		web3SignerConfig:        cfg.Web3SignerConfig,
 		proposerSettings:        cfg.ProposerSettings,
+		builderURLs:             cfg.BuilderURLs,
 		validatorsRegBatchSize:  cfg.ValidatorsRegBatchSize,
 		enableAPI:               cfg.EnableAPI,
 		emitAccountMetrics:      cfg.EmitAccountMetrics,
@@ -215,6 +218,7 @@ func (v *ValidatorService) Start() {
 		km:                           nil,
 		web3SignerConfig:             v.web3SignerConfig,
 		proposerSettings:             v.proposerSettings,
+		builderURLs:                  v.builderURLs,
 		signedValidatorRegistrations: make(map[[fieldparams.BLSPubkeyLength]byte]*ethpb.SignedValidatorRegistrationV1),
 		validatorsRegBatchSize:       v.validatorsRegBatchSize,
 		interopKeysConfig:            v.interopKeysConfig,
