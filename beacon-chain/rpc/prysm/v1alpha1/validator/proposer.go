@@ -283,15 +283,27 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 				return nil, status.Errorf(codes.Internal, "Could not set execution data: %v", err)
 			}
 		} else {
-			// Smoke test: query external builders for execution payload bids and
-			// log them. The bids are not yet used for block construction.
-			vs.logBuilderExecutionPayloadBids(ctx, sBlk, head, local)
-
 			selfBuildOnly := local.OverrideBuilder || skipMevBoost
-			selfBuildEnvelope, err = vs.setExecutionPayloadBid(ctx, sBlk, local, selfBuildOnly)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "Could not set execution data for Gloas: %v", err)
+			var builderBids map[string]*ethpb.SignedExecutionPayloadBid
+			if !selfBuildOnly {
+				builderBids = vs.getBuilderExecutionPayloadBids(ctx, sBlk, head, local)
 			}
+			selectedBid, bidErr := vs.setExecutionPayloadBid(ctx, sBlk, local, selfBuildOnly, builderBids)
+			if bidErr != nil {
+				return nil, status.Errorf(codes.Internal, "Could not set execution data for Gloas: %v", bidErr)
+			}
+			selfBuildEnvelope = selectedBid.SelfBuild
+
+			blockHtr, err := sBlk.Block().HashTreeRoot()
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "Could not hash tree root: %v", err)
+			}
+
+			log.WithFields(logrus.Fields{
+				"blockHtr": blockHtr,
+				"selectedBidIsBuilderApiBid": selectedBid.IsBuilderApiBid,
+			}).Info("BHARATH: Setting selected bid in cache")
+			vs.SelectedBidCache.Set(blockHtr, selectedBid)
 		}
 	}
 
@@ -359,6 +371,20 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "%s: %v", "handle block failed", err)
+	}
+
+	if block.Version() >= version.Gloas {
+		selectedBid, ok := vs.SelectedBidCache.Get(root)
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "Could not get selected bid: %v", err)
+		}
+
+		log.Info("BHARATH: Submitting beacon block to builder")
+		if selectedBid.IsBuilderApiBid {
+			if err := vs.BlockBuilder.SubmitBeaconBlock(ctx, selectedBid.BuilderUrl, block); err != nil {
+				return nil, status.Errorf(codes.Internal, "Could not submit beacon block: %v", err)
+			}
+		}
 	}
 
 	var wg sync.WaitGroup

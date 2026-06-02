@@ -271,6 +271,7 @@ func NewService(ctx context.Context, cfg *Config) *Service {
 		HighestBidCache:                  s.cfg.HighestBidCache,
 		PayloadIDCache:                   s.cfg.PayloadIDCache,
 		ExecutionPayloadEnvelopeCache:    s.cfg.ExecutionPayloadEnvelopeCache,
+		SelectedBidCache:                 cache.NewSelectedBidCache(),
 		AttestationStateFetcher:          s.cfg.AttestationReceiver,
 		GraffitiInfo:                     s.cfg.GraffitiInfo,
 	}
