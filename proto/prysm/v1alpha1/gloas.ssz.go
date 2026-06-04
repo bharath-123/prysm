@@ -7,6 +7,108 @@ import (
 	ssz "github.com/prysmaticlabs/fastssz"
 )
 
+// MarshalSSZ ssz marshals the RequestAuthV1 object
+func (r *RequestAuthV1) MarshalSSZ() ([]byte, error) {
+	return ssz.MarshalSSZ(r)
+}
+
+// MarshalSSZTo ssz marshals the RequestAuthV1 object to a target array
+func (r *RequestAuthV1) MarshalSSZTo(buf []byte) (dst []byte, err error) {
+	dst = buf
+	offset := int(12)
+
+	// Offset (0) 'BuilderUrl'
+	dst = ssz.WriteOffset(dst, offset)
+	offset += len(r.BuilderUrl)
+
+	// Field (1) 'Slot'
+	dst = ssz.MarshalUint(dst, r.Slot)
+
+	// Field (0) 'BuilderUrl'
+	if size := len(r.BuilderUrl); size > 2048 {
+		err = ssz.ErrBytesLengthFn("--.BuilderUrl", size, 2048)
+		return
+	}
+	dst = append(dst, r.BuilderUrl...)
+
+	return
+}
+
+// UnmarshalSSZ ssz unmarshals the RequestAuthV1 object
+func (r *RequestAuthV1) UnmarshalSSZ(buf []byte) error {
+	var err error
+	size := uint64(len(buf))
+	if size < 12 {
+		return ssz.ErrSize
+	}
+
+	tail := buf
+	var o0 uint64
+
+	// Offset (0) 'BuilderUrl'
+	if o0 = ssz.ReadOffset(buf[0:4]); o0 > size {
+		return ssz.ErrOffset
+	}
+
+	if o0 != 12 {
+		return ssz.ErrInvalidVariableOffset
+	}
+
+	// Field (1) 'Slot'
+	r.Slot = ssz.UnmarshallUint[github_com_OffchainLabs_prysm_v7_consensus_types_primitives.Slot](buf[4:12])
+
+	// Field (0) 'BuilderUrl'
+	{
+		buf = tail[o0:]
+		if len(buf) > 2048 {
+			return ssz.ErrBytesLength
+		}
+		if cap(r.BuilderUrl) == 0 {
+			r.BuilderUrl = make([]byte, 0, len(buf))
+		}
+		r.BuilderUrl = append(r.BuilderUrl, buf...)
+	}
+	return err
+}
+
+// SizeSSZ returns the ssz encoded size in bytes for the RequestAuthV1 object
+func (r *RequestAuthV1) SizeSSZ() (size int) {
+	size = 12
+
+	// Field (0) 'BuilderUrl'
+	size += len(r.BuilderUrl)
+
+	return
+}
+
+// HashTreeRoot ssz hashes the RequestAuthV1 object
+func (r *RequestAuthV1) HashTreeRoot() ([32]byte, error) {
+	return ssz.HashWithDefaultHasher(r)
+}
+
+// HashTreeRootWith ssz hashes the RequestAuthV1 object with a hasher
+func (r *RequestAuthV1) HashTreeRootWith(hh *ssz.Hasher) (err error) {
+	indx := hh.Index()
+
+	// Field (0) 'BuilderUrl'
+	{
+		elemIndx := hh.Index()
+		byteLen := uint64(len(r.BuilderUrl))
+		if byteLen > 2048 {
+			err = ssz.ErrIncorrectListSize
+			return
+		}
+		hh.AppendBytes32(r.BuilderUrl)
+		hh.MerkleizeWithMixin(elemIndx, byteLen, (2048+31)/32)
+	}
+
+	// Field (1) 'Slot'
+	ssz.PutUint(hh, r.Slot)
+
+	hh.Merkleize(indx)
+	return
+}
+
 // MarshalSSZ ssz marshals the ExecutionPayloadBid object
 func (e *ExecutionPayloadBid) MarshalSSZ() ([]byte, error) {
 	return ssz.MarshalSSZ(e)
