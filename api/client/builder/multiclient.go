@@ -191,6 +191,9 @@ func (c *MultiClient) GetExecutionPayloadBid(ctx context.Context, urls []string,
 			}
 			body = bytes.NewReader(encoded)
 			opts = append(opts, func(r *http.Request) { r.Header.Set("Content-Type", api.JsonMediaType) })
+			log.WithField("builder", host).WithField("authBody", string(encoded)).Info("BHARATH: Sending getExecutionPayloadBid with request auth body")
+		} else {
+			log.WithField("builder", host).Info("BHARATH: Sending getExecutionPayloadBid with no request auth (no matching auth for builder)")
 		}
 
 		data, _, err := c.do(ctx, base, http.MethodPost, path, body, http.StatusOK, opts...)
