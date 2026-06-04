@@ -209,6 +209,7 @@ ssz_gloas_objs = [
     "PayloadAttestationMessage",
     "ExecutionPayloadBid",
     "SignedExecutionPayloadBid",
+    "RequestAuthV1",
     "SignedBlindedExecutionPayloadEnvelope",
     "SignedExecutionPayloadEnvelope",
     "BeaconBlockGloas",

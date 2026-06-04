@@ -80,10 +80,10 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	signedRequestAuths := make([]*ethpb.SignedRequestAuthV1, len(v.builderURLs))
 	for i, url := range v.builderURLs {
 		requestAuth := &ethpb.RequestAuthV1{
-			BuilderUrl: url,
+			BuilderUrl: []byte(url),
 			Slot:       slot,
 		}
-		signedRequestAuth, err := v.signRequestAuth(ctx, pubKey, epoch, requestAuth)
+		signedRequestAuth, err := v.signRequestAuth(ctx, pubKey, requestAuth)
 		if err != nil {
 			log.WithError(err).Error("Failed to sign request auth")
 			return
@@ -463,19 +463,25 @@ func (v *validator) signBlock(ctx context.Context, pubKey [fieldparams.BLSPubkey
 	return sig.Marshal(), blockRoot, nil
 }
 
-func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, epoch primitives.Epoch, requestAuth *ethpb.RequestAuthV1) (*ethpb.SignedRequestAuthV1, error) {
+func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, requestAuth *ethpb.RequestAuthV1) (*ethpb.SignedRequestAuthV1, error) {
 	ctx, span := trace.StartSpan(ctx, "validator.signRequestAuth")
 	defer span.End()
 
-	domain, err := v.domainData(ctx, epoch, params.BeaconConfig().DomainRequestAuth[:])
+	// DOMAIN_REQUEST_AUTH is an application-space domain (0x0B000001). Per spec,
+	// compute_domain(DOMAIN_REQUEST_AUTH) is called with no fork version and no
+	// genesis validators root, so both default to the genesis fork version and a
+	// zero root — it is NOT chain-fork bound. This mirrors how validator
+	// registrations are signed with DomainApplicationBuilder, so we compute the
+	// domain locally rather than via the fork-aware domainData RPC.
+	domain, err := signing.ComputeDomain(
+		params.BeaconConfig().DomainRequestAuth,
+		nil, /* fork version */
+		nil /* genesis validators root */)
 	if err != nil {
-		return nil, errors.Wrap(err, domainDataErr)
-	}
-	if domain == nil {
-		return nil, errors.New(domainDataErr)
+		return nil, err
 	}
 
-	requestAuthRoot, err := signing.ComputeSigningRoot(requestAuth, domain.SignatureDomain)
+	requestAuthRoot, err := signing.ComputeSigningRoot(requestAuth, domain)
 	if err != nil {
 		return nil, errors.Wrap(err, signingRootErr)
 	}
@@ -483,7 +489,7 @@ func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLS
 	sig, err := v.km.Sign(ctx, &validatorpb.SignRequest{
 		PublicKey:       pubKey[:],
 		SigningRoot:     requestAuthRoot[:],
-		SignatureDomain: domain.SignatureDomain,
+		SignatureDomain: domain,
 		Object:          &validatorpb.SignRequest_RequestAuth{RequestAuth: requestAuth},
 	})
 	if err != nil {
