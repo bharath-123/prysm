@@ -77,11 +77,26 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		log.WithError(err).Warn("Could not get graffiti")
 	}
 
+	signedRequestAuths := make([]*ethpb.SignedRequestAuthV1, len(v.builderURLs))
+	for i, url := range v.builderURLs {
+		requestAuth := &ethpb.RequestAuthV1{
+			BuilderUrl: url,
+			Slot:       slot,
+		}
+		signedRequestAuth, err := v.signRequestAuth(ctx, pubKey, epoch, requestAuth)
+		if err != nil {
+			log.WithError(err).Error("Failed to sign request auth")
+			return
+		}
+		signedRequestAuths[i] = signedRequestAuth
+	}
+
 	// Request block from beacon node
 	b, err := v.validatorClient.BeaconBlock(ctx, &ethpb.BlockRequest{
-		Slot:         slot,
-		RandaoReveal: randaoReveal,
-		Graffiti:     g,
+		Slot:                slot,
+		RandaoReveal:        randaoReveal,
+		Graffiti:            g,
+		BuilderRequestAuths: signedRequestAuths,
 	})
 	if err != nil {
 		log.WithField("slot", slot).WithError(err).Error("Failed to request block from beacon node")
@@ -413,53 +428,6 @@ func (v *validator) signRandaoReveal(ctx context.Context, pubKey [fieldparams.BL
 	return randaoReveal.Marshal(), nil
 }
 
-// signRequestAuth signs a RequestAuthV1 (builder_url + slot), authenticating a
-// proposer's getExecutionPayloadBid request to a specific Gloas builder. The
-// resulting SignedRequestAuthV1 is sent as the optional request body so the
-// builder can bind the request to this proposer and this builder URL.
-//
-// Per the Builder API spec the signature uses DOMAIN_REQUEST_AUTH (0x0B000001),
-// an application-space domain: compute_domain is called with no fork_version and
-// no genesis_validators_root, so both default to the genesis fork version and a
-// zero root (it is NOT chain-fork bound). This mirrors how validator
-// registrations are signed with DomainApplicationBuilder, not a consensus domain
-// such as DomainProposerPreferences.
-func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, auth *ethpb.RequestAuthV1) (*ethpb.SignedRequestAuthV1, error) {
-	ctx, span := trace.StartSpan(ctx, "validator.signRequestAuth")
-	defer span.End()
-
-	// Per spec, fork version and genesis validators root are nil — genesis/zero
-	// by default (application domain, not chain-fork bound).
-	domain, err := signing.ComputeDomain(
-		params.BeaconConfig().DomainRequestAuth,
-		nil, /* fork version */
-		nil /* genesis validators root */)
-	if err != nil {
-		return nil, err
-	}
-
-	root, err := signing.ComputeSigningRoot(auth, domain)
-	if err != nil {
-		return nil, errors.Wrap(err, signingRootErr)
-	}
-
-	sig, err := v.km.Sign(ctx, &validatorpb.SignRequest{
-		PublicKey:       pubKey[:],
-		SigningRoot:     root[:],
-		SignatureDomain: domain,
-		Object:          &validatorpb.SignRequest_RequestAuth{RequestAuth: auth},
-		SigningSlot:     auth.Slot,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "could not sign request auth")
-	}
-
-	return &ethpb.SignedRequestAuthV1{
-		Message:   auth,
-		Signature: sig.Marshal(),
-	}, nil
-}
-
 // Sign block with proposer domain and private key.
 // Returns the signature, block signing root, and any error.
 func (v *validator) signBlock(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, epoch primitives.Epoch, slot primitives.Slot, b interfaces.ReadOnlyBeaconBlock) ([]byte, [32]byte, error) {
@@ -493,6 +461,38 @@ func (v *validator) signBlock(ctx context.Context, pubKey [fieldparams.BLSPubkey
 		return nil, [32]byte{}, errors.Wrap(err, "could not sign block proposal")
 	}
 	return sig.Marshal(), blockRoot, nil
+}
+
+func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, epoch primitives.Epoch, requestAuth *ethpb.RequestAuthV1) (*ethpb.SignedRequestAuthV1, error) {
+	ctx, span := trace.StartSpan(ctx, "validator.signRequestAuth")
+	defer span.End()
+
+	domain, err := v.domainData(ctx, epoch, params.BeaconConfig().DomainRequestAuth[:])
+	if err != nil {
+		return nil, errors.Wrap(err, domainDataErr)
+	}
+	if domain == nil {
+		return nil, errors.New(domainDataErr)
+	}
+
+	requestAuthRoot, err := signing.ComputeSigningRoot(requestAuth, domain.SignatureDomain)
+	if err != nil {
+		return nil, errors.Wrap(err, signingRootErr)
+	}
+
+	sig, err := v.km.Sign(ctx, &validatorpb.SignRequest{
+		PublicKey:       pubKey[:],
+		SigningRoot:     requestAuthRoot[:],
+		SignatureDomain: domain.SignatureDomain,
+		Object:          &validatorpb.SignRequest_RequestAuth{RequestAuth: requestAuth},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "could not sign request auth")
+	}
+	return &ethpb.SignedRequestAuthV1{
+		Message:   requestAuth,
+		Signature: sig.Marshal(),
+	}, nil
 }
 
 // Sign voluntary exit with proposer domain and private key.
