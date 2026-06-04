@@ -974,6 +974,10 @@ message BlockRequest {
   // the SignedRequestAuthV1 body of the corresponding getExecutionPayloadBid
   // request.
   repeated SignedRequestAuthV1 builder_request_auths = 7;
+
+  // Gloas (post-ePBS) Builder API builder URLs the proposer wants bids from.
+  // The beacon node fans out getExecutionPayloadBid to each of these URLs.
+  repeated string builder_urls = 8;
 }
 
 message ProposeResponse {
