@@ -18,6 +18,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/monitoring/tracing/trace"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
@@ -184,7 +185,7 @@ func (c *MultiClient) GetExecutionPayloadBid(ctx context.Context, urls []string,
 		var body io.Reader
 		opts := []reqOption{func(r *http.Request) { r.Header.Set("Accept", api.JsonMediaType) }}
 		if auth, ok := authByURL[host]; ok {
-			encoded, err := json.Marshal(auth)
+			encoded, err := marshalRequestAuth(auth)
 			if err != nil {
 				log.WithError(err).WithField("builder", host).Warn("Failed to encode request auth, skipping")
 				continue
@@ -280,4 +281,31 @@ func parseExecutionPayloadBidResponse(data []byte) (*ethpb.SignedExecutionPayloa
 		return nil, errors.New("execution payload bid response missing data")
 	}
 	return resp.Data.ToConsensus()
+}
+
+// signedRequestAuthJSON is the JSON wire form of a SignedRequestAuthV1 used as
+// the optional getExecutionPayloadBid auth body. builder_url is a plain URL
+// string (not base64/hex), slot is a decimal string, and signature is 0x-hex —
+// matching the Builder API spec (examples/gloas/signed_request_auth.json). The
+// generated proto JSON cannot be used directly: builder_url is a `bytes` field,
+// so encoding/json would emit it base64-encoded.
+type signedRequestAuthJSON struct {
+	Message   requestAuthJSON `json:"message"`
+	Signature string          `json:"signature"`
+}
+
+type requestAuthJSON struct {
+	BuilderURL string `json:"builder_url"`
+	Slot       string `json:"slot"`
+}
+
+// marshalRequestAuth encodes a SignedRequestAuthV1 to its Builder API JSON form.
+func marshalRequestAuth(a *ethpb.SignedRequestAuthV1) ([]byte, error) {
+	return json.Marshal(signedRequestAuthJSON{
+		Message: requestAuthJSON{
+			BuilderURL: string(a.Message.BuilderUrl),
+			Slot:       fmt.Sprintf("%d", a.Message.Slot),
+		},
+		Signature: hexutil.Encode(a.Signature),
+	})
 }
