@@ -118,11 +118,13 @@ func highestBuilderApiBid(bids map[string]*ethpb.SignedExecutionPayloadBid) (str
 	return bestURL, bestBid, bestValue, found
 }
 
-// getBuilderExecutionPayloadBids queries the configured external builders for
+// getBuilderExecutionPayloadBids queries the builders named in builderUrls for
 // execution payload bids for this block, keyed by the builder URL that served
-// each bid. Returns nil if no builders are configured or the request fails.
-func (vs *Server) getBuilderExecutionPayloadBids(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, local *consensusblocks.GetPayloadResponse) map[string]*ethpb.SignedExecutionPayloadBid {
-	if vs.BlockBuilder == nil || local == nil || local.ExecutionData == nil {
+// each bid. The builder URLs and their matching request auths originate from the
+// validator client (forwarded in the BlockRequest). Returns nil if no builders
+// are supplied or the request fails.
+func (vs *Server) getBuilderExecutionPayloadBids(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, local *consensusblocks.GetPayloadResponse, builderUrls []string, builderRequestAuths []*ethpb.SignedRequestAuthV1) map[string]*ethpb.SignedExecutionPayloadBid {
+	if vs.BlockBuilder == nil || local == nil || local.ExecutionData == nil || len(builderUrls) == 0 {
 		return nil
 	}
 	var parentHash [32]byte
@@ -130,7 +132,7 @@ func (vs *Server) getBuilderExecutionPayloadBids(ctx context.Context, sBlk inter
 	parentRoot := sBlk.Block().ParentRoot()
 	pubkey := head.PubkeyAtIndex(sBlk.Block().ProposerIndex())
 
-	bids, err := vs.BlockBuilder.GetExecutionPayloadBid(ctx, sBlk.Block().Slot(), parentHash, parentRoot, pubkey)
+	bids, err := vs.BlockBuilder.GetExecutionPayloadBid(ctx, builderUrls, builderRequestAuths, sBlk.Block().Slot(), parentHash, parentRoot, pubkey)
 	if err != nil {
 		log.WithError(err).Debug("Could not get execution payload bids from builders")
 		return nil

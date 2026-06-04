@@ -1,8 +1,6 @@
 package builder
 
 import (
-	"strings"
-
 	"github.com/OffchainLabs/prysm/v7/api/client/builder"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/blockchain"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
@@ -34,32 +32,20 @@ func FlagOptions(c *cli.Context) ([]Option, error) {
 		WithBuilderClient(client),
 	}
 
-	// Gloas (post-ePBS) builders are connected to directly via a multi-builder client.
-	if hosts := splitBuilderURLs(c.String(flags.BuilderURLs.Name)); len(hosts) > 0 {
-		var mopts []builder.MultiClientOpt
-		if sszEnabled {
-			mopts = append(mopts, builder.WithMultiClientSSZ())
-		}
-		multiClient, err := builder.NewMultiClient(hosts, mopts...)
-		if err != nil {
-			return nil, err
-		}
-		opts = append(opts, WithMultiBuilderClient(multiClient))
+	// Gloas (post-ePBS) builders are connected to directly via a multi-builder
+	// client. The set of builders to query is supplied per request by the
+	// validator client (in the BlockRequest), so this client holds no URLs of its
+	// own and is constructed unconditionally.
+	var mopts []builder.MultiClientOpt
+	if sszEnabled {
+		mopts = append(mopts, builder.WithMultiClientSSZ())
 	}
+	multiClient, err := builder.NewMultiClient(mopts...)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, WithMultiBuilderClient(multiClient))
 	return opts, nil
-}
-
-// splitBuilderURLs parses a comma-separated list of builder URLs, trimming
-// whitespace and dropping empty entries.
-func splitBuilderURLs(raw string) []string {
-	parts := strings.Split(raw, ",")
-	hosts := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if s := strings.TrimSpace(p); s != "" {
-			hosts = append(hosts, s)
-		}
-	}
-	return hosts
 }
 
 // WithBuilderClient sets the builder client for the beacon chain builder service.

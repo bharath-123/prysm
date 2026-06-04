@@ -27,7 +27,7 @@ type BlockBuilder interface {
 	SubmitBlindedBlock(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) (interfaces.ExecutionData, v1.BlobsBundler, error)
 	SubmitBlindedBlockPostFulu(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) error
 	GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubKey [48]byte) (builder.SignedBid, error)
-	GetExecutionPayloadBid(ctx context.Context, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error)
+	GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error)
 	SubmitBeaconBlock(ctx context.Context, builderURL string, block interfaces.ReadOnlySignedBeaconBlock) error
 	RegisterValidator(ctx context.Context, reg []*ethpb.SignedValidatorRegistrationV1) error
 	RegistrationByValidatorID(ctx context.Context, id primitives.ValidatorIndex) (*ethpb.ValidatorRegistrationV1, error)
@@ -79,7 +79,6 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 	}
 	if s.cfg.multiBuilderClient != nil && !reflect.ValueOf(s.cfg.multiBuilderClient).IsNil() {
 		s.mc = s.cfg.multiBuilderClient
-		log.WithField("endpoints", s.mc.NodeURLs()).Info("Gloas builders have been configured")
 	}
 	return s, nil
 }
@@ -87,7 +86,6 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 // Start initializes the service.
 func (s *Service) Start() {
 	go s.pollRelayerStatus(s.ctx)
-	go s.pollBuilderStatus(s.ctx)
 }
 
 // Stop halts the service.
@@ -145,10 +143,12 @@ func (s *Service) GetHeader(ctx context.Context, slot primitives.Slot, parentHas
 	return h, err
 }
 
-// GetExecutionPayloadBid requests execution payload bids from the configured
-// Gloas builders for the given (slot, parentHash, parentRoot, proposer pubkey)
-// tuple and returns the bids that were served successfully.
-func (s *Service) GetExecutionPayloadBid(ctx context.Context, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
+// GetExecutionPayloadBid requests execution payload bids from the given Gloas
+// builder URLs for the (slot, parentHash, parentRoot, proposer pubkey) tuple and
+// returns the bids that were served successfully. The URLs and their matching
+// request auths are supplied by the validator client (via the BlockRequest), not
+// by beacon-node configuration.
+func (s *Service) GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
 	ctx, span := trace.StartSpan(ctx, "builder.GetExecutionPayloadBid")
 	defer span.End()
 	start := time.Now()
@@ -160,7 +160,7 @@ func (s *Service) GetExecutionPayloadBid(ctx context.Context, slot primitives.Sl
 		return nil, ErrNoBuilder
 	}
 
-	bids, err := s.mc.GetExecutionPayloadBid(ctx, slot, parentHash, parentRoot, pubKey)
+	bids, err := s.mc.GetExecutionPayloadBid(ctx, urls, auths, slot, parentHash, parentRoot, pubKey)
 	tracing.AnnotateError(span, err)
 	return bids, err
 }
@@ -265,25 +265,6 @@ func (s *Service) pollRelayerStatus(ctx context.Context) {
 			if s.c != nil {
 				if err := s.c.Status(ctx); err != nil {
 					log.WithError(err).Error("Failed to call relayer status endpoint, perhaps mev-boost or relayers are down")
-				}
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-// pollBuilderStatus periodically checks the status of the configured Gloas
-// builders.
-func (s *Service) pollBuilderStatus(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			if s.mc != nil {
-				if err := s.mc.Status(ctx); err != nil {
-					log.WithError(err).Error("Failed to call builder status endpoint, perhaps one or more Gloas builders are down")
 				}
 			}
 		case <-ctx.Done():

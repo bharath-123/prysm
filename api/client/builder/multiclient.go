@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/OffchainLabs/prysm/v7/api"
 	"github.com/OffchainLabs/prysm/v7/api/client"
@@ -36,15 +35,15 @@ const postBeaconBlockPath = "/eth/v1/builder/beacon_block"
 // MultiBuilderClient connects directly to one or more builders and fans requests
 // out across all of them.
 type MultiBuilderClient interface {
-	// NodeURLs returns the configured builder endpoint URLs.
-	NodeURLs() []string
-	// GetExecutionPayloadBid requests an execution payload bid from each
-	// configured builder and returns the bids that were served successfully,
-	// keyed by the builder URL that served each bid (used for provenance so the
-	// signed beacon block can later be submitted back to the selected builder).
-	GetExecutionPayloadBid(ctx context.Context, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubkey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error)
-	// Status checks the status endpoint of every configured builder.
-	Status(ctx context.Context) error
+	// GetExecutionPayloadBid requests an execution payload bid from each builder
+	// URL passed in and returns the bids that were served successfully, keyed by
+	// the builder URL that served each bid (used for provenance so the signed
+	// beacon block can later be submitted back to the selected builder). For each
+	// builder the matching SignedRequestAuthV1 (by builder_url) is attached as the
+	// optional request body. The builder URLs and auths originate from the
+	// validator client (forwarded in the BlockRequest), not from beacon-node
+	// configuration.
+	GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubkey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error)
 	// SubmitBeaconBlock submits the signed beacon block back to the single
 	// builder (identified by builderURL) whose bid was selected, so that builder
 	// can reveal the corresponding execution payload envelope.
@@ -80,49 +79,25 @@ func WithMultiClientObserver(m observer) MultiClientOpt {
 // multiplexer), so requests such as getExecutionPayloadBid fan out across all of
 // the configured builder URLs.
 type MultiClient struct {
-	hc          *http.Client
-	builderURLs []*url.URL
-	obvs        []observer
-	sszEnabled  bool
+	hc         *http.Client
+	obvs       []observer
+	sszEnabled bool
 }
 
 var _ MultiBuilderClient = &MultiClient{}
 
-// NewMultiClient constructs a MultiClient targeting the provided builder hosts.
-// Each host can be a URL string or a `host:port` pair (assumed http), matching
-// the parsing rules used by the single-endpoint Client.
-func NewMultiClient(hosts []string, opts ...MultiClientOpt) (*MultiClient, error) {
-	urls := make([]*url.URL, 0, len(hosts))
-	for _, h := range hosts {
-		u, err := urlForHost(h)
-		if err != nil {
-			return nil, err
-		}
-		urls = append(urls, u)
-	}
+// NewMultiClient constructs a MultiClient. It holds no builder URLs of its own:
+// post-ePBS the set of builders to query is supplied per request by the
+// validator client (forwarded in the BlockRequest), so each call to
+// GetExecutionPayloadBid passes in the URLs to fan out to.
+func NewMultiClient(opts ...MultiClientOpt) (*MultiClient, error) {
 	c := &MultiClient{
-		hc:          &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)},
-		builderURLs: urls,
+		hc: &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)},
 	}
 	for _, o := range opts {
 		o(c)
 	}
 	return c, nil
-}
-
-// NodeURLs returns the configured builder endpoint URLs.
-func (c *MultiClient) NodeURLs() []string {
-	hosts := make([]string, 0, len(c.builderURLs))
-	for _, u := range c.builderURLs {
-		hosts = append(hosts, u.String())
-	}
-	return hosts
-}
-
-// NodeURL returns the configured builder endpoint URLs as a comma-separated
-// string, for logging.
-func (c *MultiClient) NodeURL() string {
-	return strings.Join(c.NodeURLs(), ",")
 }
 
 // do issues a single request against the given builder base URL and validates
@@ -177,22 +152,48 @@ func (c *MultiClient) do(ctx context.Context, base *url.URL, method string, path
 	return
 }
 
-// GetExecutionPayloadBid requests an execution payload bid from each configured
-// builder for the given (slot, parentHash, parentRoot, proposer pubkey) tuple and
-// returns the bids that were served successfully. Builders that return no bid
-// (204) or error are skipped; bid selection is performed by the caller.
-func (c *MultiClient) GetExecutionPayloadBid(ctx context.Context, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubkey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
+// GetExecutionPayloadBid requests an execution payload bid from each builder URL
+// passed in for the given (slot, parentHash, parentRoot, proposer pubkey) tuple
+// and returns the bids that were served successfully. For each builder, the
+// SignedRequestAuthV1 whose message builder_url matches that URL is attached as
+// the optional request body. Builders that return no bid (204) or error are
+// skipped; bid selection is performed by the caller.
+func (c *MultiClient) GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubkey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
 	ctx, span := trace.StartSpan(ctx, "builder.multiclient.GetExecutionPayloadBid")
 	defer span.End()
 
 	path := fmt.Sprintf(getExecutionPayloadBidPath, slot, parentHash, parentRoot, pubkey)
-	acceptJSON := func(r *http.Request) {
-		r.Header.Set("Accept", api.JsonMediaType)
+
+	// Index the request auths by the builder URL they were signed for, so each
+	// builder receives only its own auth as the optional request body.
+	authByURL := make(map[string]*ethpb.SignedRequestAuthV1, len(auths))
+	for _, a := range auths {
+		if a != nil && a.Message != nil {
+			authByURL[string(a.Message.BuilderUrl)] = a
+		}
 	}
 
-	bids := make(map[string]*ethpb.SignedExecutionPayloadBid, len(c.builderURLs))
-	for _, base := range c.builderURLs {
-		data, _, err := c.do(ctx, base, http.MethodPost, path, nil, http.StatusOK, acceptJSON)
+	bids := make(map[string]*ethpb.SignedExecutionPayloadBid, len(urls))
+	for _, host := range urls {
+		base, err := urlForHost(host)
+		if err != nil {
+			log.WithError(err).WithField("builder", host).Warn("Invalid builder URL, skipping")
+			continue
+		}
+
+		var body io.Reader
+		opts := []reqOption{func(r *http.Request) { r.Header.Set("Accept", api.JsonMediaType) }}
+		if auth, ok := authByURL[host]; ok {
+			encoded, err := json.Marshal(auth)
+			if err != nil {
+				log.WithError(err).WithField("builder", host).Warn("Failed to encode request auth, skipping")
+				continue
+			}
+			body = bytes.NewReader(encoded)
+			opts = append(opts, func(r *http.Request) { r.Header.Set("Content-Type", api.JsonMediaType) })
+		}
+
+		data, _, err := c.do(ctx, base, http.MethodPost, path, body, http.StatusOK, opts...)
 		if err != nil {
 			log.WithError(err).WithField("builder", base.String()).Debug("No execution payload bid from builder")
 			continue
@@ -207,28 +208,6 @@ func (c *MultiClient) GetExecutionPayloadBid(ctx context.Context, slot primitive
 	return bids, nil
 }
 
-// Status queries the status endpoint of every configured builder. It returns
-// nil only if all builders respond healthy; otherwise it returns an error
-// summarizing which builders failed and why.
-func (c *MultiClient) Status(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "builder.multiclient.Status")
-	defer span.End()
-
-	acceptJSON := func(r *http.Request) {
-		r.Header.Set("Accept", api.JsonMediaType)
-	}
-	var failures []string
-	for _, base := range c.builderURLs {
-		if _, _, err := c.do(ctx, base, http.MethodGet, getStatus, nil, http.StatusOK, acceptJSON); err != nil {
-			failures = append(failures, fmt.Sprintf("%s: %v", base.String(), err))
-		}
-	}
-	if len(failures) > 0 {
-		return errors.Errorf("status check failed for %d/%d builder(s): %s", len(failures), len(c.builderURLs), strings.Join(failures, "; "))
-	}
-	return nil
-}
-
 // SubmitBeaconBlock submits the signed beacon block back to the builder
 // identified by builderURL. We submit only to the builder whose bid was selected
 // because only that builder holds the execution payload it needs to reveal.
@@ -240,6 +219,7 @@ func (c *MultiClient) SubmitBeaconBlock(ctx context.Context, builderURL string, 
 	if err != nil {
 		return errors.Wrapf(err, "invalid builder url %q", builderURL)
 	}
+	
 	body, opt, err := c.buildBeaconBlockRequest(sb)
 	if err != nil {
 		return err

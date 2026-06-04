@@ -97,6 +97,7 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		RandaoReveal:        randaoReveal,
 		Graffiti:            g,
 		BuilderRequestAuths: signedRequestAuths,
+		BuilderUrls:         v.builderURLs,
 	})
 	if err != nil {
 		log.WithField("slot", slot).WithError(err).Error("Failed to request block from beacon node")

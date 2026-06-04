@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -72,12 +71,9 @@ func TestMultiClient_GetExecutionPayloadBid_SingleBuilder(t *testing.T) {
 			}, nil
 		}),
 	}
-	c := &MultiClient{
-		hc:          hc,
-		builderURLs: []*url.URL{{Host: "builder1:3500", Scheme: "http"}},
-	}
+	c := &MultiClient{hc: hc}
 
-	bids, err := c.GetExecutionPayloadBid(ctx, primitives.Slot(slot), parentHash, parentRoot, pubkey)
+	bids, err := c.GetExecutionPayloadBid(ctx, []string{"http://builder1:3500"}, nil, primitives.Slot(slot), parentHash, parentRoot, pubkey)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(bids))
 	got, ok := bids["http://builder1:3500"]
@@ -102,12 +98,9 @@ func TestMultiClient_GetExecutionPayloadBid_NoBid(t *testing.T) {
 			}, nil
 		}),
 	}
-	c := &MultiClient{
-		hc:          hc,
-		builderURLs: []*url.URL{{Host: "builder1:3500", Scheme: "http"}},
-	}
+	c := &MultiClient{hc: hc}
 
-	bids, err := c.GetExecutionPayloadBid(ctx, 1, [32]byte{}, [32]byte{}, [48]byte{})
+	bids, err := c.GetExecutionPayloadBid(ctx, []string{"http://builder1:3500"}, nil, 1, [32]byte{}, [32]byte{}, [48]byte{})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(bids))
 }
@@ -130,7 +123,7 @@ func TestMultiClient_SubmitBeaconBlock(t *testing.T) {
 			}, nil
 		}),
 	}
-	c := &MultiClient{hc: hc, builderURLs: []*url.URL{{Host: "builder1:3500", Scheme: "http"}}}
+	c := &MultiClient{hc: hc}
 
 	// Submits to the passed URL (builder2), not the configured builder1.
 	require.NoError(t, c.SubmitBeaconBlock(ctx, "http://builder2:4000", blk))
@@ -152,38 +145,8 @@ func TestMultiClient_SubmitBeaconBlock_Error(t *testing.T) {
 			}, nil
 		}),
 	}
-	c := &MultiClient{hc: hc, builderURLs: []*url.URL{{Host: "builder1:3500", Scheme: "http"}}}
+	c := &MultiClient{hc: hc}
 	require.ErrorContains(t, "builder", c.SubmitBeaconBlock(ctx, "http://builder1:3500", blk))
-}
-
-func TestMultiClient_Status(t *testing.T) {
-	ctx := t.Context()
-	hc := &http.Client{
-		Transport: roundtrip(func(r *http.Request) (*http.Response, error) {
-			require.Equal(t, "/eth/v1/builder/status", r.URL.Path)
-			// builder2 is unhealthy.
-			status := http.StatusOK
-			if strings.HasPrefix(r.URL.Host, "builder2") {
-				status = http.StatusInternalServerError
-			}
-			return &http.Response{
-				StatusCode: status,
-				Body:       io.NopCloser(bytes.NewBuffer(nil)),
-				Request:    r.Clone(ctx),
-			}, nil
-		}),
-	}
-
-	// All healthy.
-	cOK := &MultiClient{hc: hc, builderURLs: []*url.URL{{Host: "builder1:3500", Scheme: "http"}}}
-	require.NoError(t, cOK.Status(ctx))
-
-	// One unhealthy -> error.
-	cBad := &MultiClient{hc: hc, builderURLs: []*url.URL{
-		{Host: "builder1:3500", Scheme: "http"},
-		{Host: "builder2:3500", Scheme: "http"},
-	}}
-	require.ErrorContains(t, "builder2", cBad.Status(ctx))
 }
 
 func TestMultiClient_GetExecutionPayloadBid_FanOut(t *testing.T) {
@@ -205,15 +168,9 @@ func TestMultiClient_GetExecutionPayloadBid_FanOut(t *testing.T) {
 			}, nil
 		}),
 	}
-	c := &MultiClient{
-		hc: hc,
-		builderURLs: []*url.URL{
-			{Host: "builder1:3500", Scheme: "http"},
-			{Host: "builder2:3500", Scheme: "http"},
-		},
-	}
+	c := &MultiClient{hc: hc}
 
-	bids, err := c.GetExecutionPayloadBid(ctx, 1, [32]byte{}, [32]byte{}, [48]byte{})
+	bids, err := c.GetExecutionPayloadBid(ctx, []string{"http://builder1:3500", "http://builder2:3500"}, nil, 1, [32]byte{}, [32]byte{}, [48]byte{})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(bids))
 }

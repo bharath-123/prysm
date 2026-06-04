@@ -105,7 +105,7 @@ func (s *MockBuilderService) GetHeader(_ context.Context, slot primitives.Slot, 
 }
 
 // GetExecutionPayloadBid for mocking.
-func (s *MockBuilderService) GetExecutionPayloadBid(_ context.Context, _ primitives.Slot, _ [32]byte, _ [32]byte, _ [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
+func (s *MockBuilderService) GetExecutionPayloadBid(_ context.Context, _ []string, _ []*ethpb.SignedRequestAuthV1, _ primitives.Slot, _ [32]byte, _ [32]byte, _ [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
 	return s.Bids, s.ErrGetExecutionPayloadBid
 }
 
