@@ -29,6 +29,7 @@ type BlockBuilder interface {
 	GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubKey [48]byte) (builder.SignedBid, error)
 	GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error)
 	SubmitBeaconBlock(ctx context.Context, builderURL string, block interfaces.ReadOnlySignedBeaconBlock) error
+	SubmitBuilderPreferences(ctx context.Context, validatorPubkey [48]byte, prefsByURL map[string]*ethpb.BuilderPreferencesRequestV1) error
 	RegisterValidator(ctx context.Context, reg []*ethpb.SignedValidatorRegistrationV1) error
 	RegistrationByValidatorID(ctx context.Context, id primitives.ValidatorIndex) (*ethpb.ValidatorRegistrationV1, error)
 	Configured() bool
@@ -178,6 +179,18 @@ func (s *Service) SubmitBeaconBlock(ctx context.Context, builderURL string, b in
 		return ErrNoBuilder
 	}
 	return s.mc.SubmitBeaconBlock(ctx, builderURL, b)
+}
+
+// SubmitBuilderPreferences submits the proposer's per-builder preferences to the
+// Gloas builders named in prefsByURL. The builder URLs and the matching request
+// auths originate from the validator client.
+func (s *Service) SubmitBuilderPreferences(ctx context.Context, validatorPubkey [48]byte, prefsByURL map[string]*ethpb.BuilderPreferencesRequestV1) error {
+	ctx, span := trace.StartSpan(ctx, "builder.SubmitBuilderPreferences")
+	defer span.End()
+	if s.mc == nil {
+		return ErrNoBuilder
+	}
+	return s.mc.SubmitBuilderPreferences(ctx, validatorPubkey, prefsByURL)
 }
 
 // Status retrieves the status of the builder relay network.

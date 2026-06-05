@@ -42,6 +42,7 @@ type MockBuilderService struct {
 	Bids                          map[string]*ethpb.SignedExecutionPayloadBid
 	ErrGetExecutionPayloadBid     error
 	ErrSubmitBeaconBlock          error
+	ErrSubmitBuilderPreferences   error
 	Cfg                           *Config
 }
 
@@ -112,6 +113,11 @@ func (s *MockBuilderService) GetExecutionPayloadBid(_ context.Context, _ []strin
 // SubmitBeaconBlock for mocking.
 func (s *MockBuilderService) SubmitBeaconBlock(_ context.Context, _ string, _ interfaces.ReadOnlySignedBeaconBlock) error {
 	return s.ErrSubmitBeaconBlock
+}
+
+// SubmitBuilderPreferences for mocking.
+func (s *MockBuilderService) SubmitBuilderPreferences(_ context.Context, _ [48]byte, _ map[string]*ethpb.BuilderPreferencesRequestV1) error {
+	return s.ErrSubmitBuilderPreferences
 }
 
 // RegistrationByValidatorID returns either the values from the cache or db.
