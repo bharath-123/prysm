@@ -11,6 +11,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/execution"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/state"
+	"github.com/OffchainLabs/prysm/v7/config/params"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/blocks"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/interfaces"
 	payloadattribute "github.com/OffchainLabs/prysm/v7/consensus-types/payload-attribute"
@@ -20,6 +21,7 @@ import (
 	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/runtime/version"
+	"github.com/OffchainLabs/prysm/v7/time/slots"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -68,7 +70,11 @@ func (s *Service) ReceiveExecutionPayloadEnvelope(ctx context.Context, signed in
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return gloas.VerifyExecutionPayloadEnvelope(gCtx, blockState, signed)
+		if err := gloas.VerifyExecutionPayloadEnvelope(gCtx, blockState, signed); err != nil {
+			return err
+		}
+		s.recordPayloadArrival(root, envelope.Slot(), start)
+		return nil
 	})
 
 	g.Go(func() error {
@@ -86,7 +92,7 @@ func (s *Service) ReceiveExecutionPayloadEnvelope(ctx context.Context, signed in
 	if err != nil {
 		return errors.Wrap(err, "could not get latest execution payload bid")
 	}
-	if len(bid.BlobKzgCommitments()) > 0 {
+	if bid != nil && len(bid.BlobKzgCommitments()) > 0 {
 		if err := s.areDataColumnsAvailable(ctx, root, envelope.Slot()); err != nil {
 			return errors.Wrap(err, "data availability check failed for payload envelope")
 		}
@@ -157,7 +163,7 @@ func (s *Service) postPayloadTasks(ctx context.Context, envelope interfaces.ROEx
 	blockHash := bytesutil.ToBytes32(payload.BlockHash())
 
 	s.headLock.Lock()
-	if s.head != nil {
+	if s.head != nil && s.head.root == root {
 		s.head.full = true
 	}
 	s.headLock.Unlock()
@@ -274,10 +280,13 @@ func (s *Service) notifyNewEnvelope(ctx context.Context, st state.BeaconState, e
 	if err != nil {
 		return false, errors.Wrap(err, "could not get latest execution payload bid")
 	}
-	commitments := latestBid.BlobKzgCommitments()
-	versionedHashes := make([]common.Hash, len(commitments))
-	for i, c := range commitments {
-		versionedHashes[i] = primitives.ConvertKzgCommitmentToVersionedHash(c)
+	var versionedHashes []common.Hash
+	if latestBid != nil {
+		commitments := latestBid.BlobKzgCommitments()
+		versionedHashes = make([]common.Hash, len(commitments))
+		for i, c := range commitments {
+			versionedHashes[i] = primitives.ConvertKzgCommitmentToVersionedHash(c)
+		}
 	}
 	return s.callNewPayload(ctx, payload, versionedHashes, common.Hash(envelope.ParentBeaconBlockRoot()), envelope.ExecutionRequests(), envelope.Slot())
 }
@@ -319,6 +328,21 @@ type gloasFCUEvent struct {
 	headRoot      [32]byte
 	proposalSlot  primitives.Slot
 	proposerIndex primitives.ValidatorIndex
+}
+
+func (s *Service) recordPayloadArrival(root [32]byte, slot primitives.Slot, arrivedAt time.Time) {
+	slotStart, err := slots.StartTime(s.genesisTime, slot)
+	if err != nil {
+		return
+	}
+	cfg := params.BeaconConfig()
+	due := slotStart.Add(cfg.SlotComponentDuration(cfg.PayloadDueBPS))
+	s.payloadArrivals.record(root, slot, arrivedAt.Before(due))
+}
+
+// PayloadEarly reports whether the payload for root arrived early; second return is false when unknown.
+func (s *Service) PayloadEarly(root [32]byte) (bool, bool) {
+	return s.payloadArrivals.isEarly(root)
 }
 
 // notifyForkchoiceUpdateGloas takes the block hash directly because Gloas

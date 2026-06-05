@@ -49,6 +49,17 @@ var emptyBuilderPendingPayment = &ethpb.BuilderPendingPayment{
 	},
 }
 
+func newBuilderIdxMap(builders []*ethpb.Builder) map[[fieldparams.BLSPubkeyLength]byte]primitives.BuilderIndex {
+	m := make(map[[fieldparams.BLSPubkeyLength]byte]primitives.BuilderIndex, len(builders))
+	for i, builder := range builders {
+		if builder == nil {
+			continue
+		}
+		m[bytesutil.ToBytes48(builder.Pubkey)] = primitives.BuilderIndex(i)
+	}
+	return m
+}
+
 // AppendBuilderPendingWithdrawals appends builder pending withdrawals to the beacon state.
 // If the withdrawals slice is shared, it copies the slice first to preserve references.
 func (b *BeaconState) AppendBuilderPendingWithdrawals(withdrawals []*ethpb.BuilderPendingWithdrawal) error {
@@ -294,7 +305,11 @@ func (b *BeaconState) UpdateBuilderAtIndex(index primitives.BuilderIndex, builde
 		b.sharedFieldReferences[types.Builders] = stateutil.NewRef(1)
 	}
 
+	if old := builders[idx]; old != nil {
+		delete(b.builderIdxMap, bytesutil.ToBytes48(old.Pubkey))
+	}
 	builders[idx] = ethpb.CopyBuilder(builder)
+	b.builderIdxMap[bytesutil.ToBytes48(builder.Pubkey)] = index
 	b.builders = builders
 
 	b.markFieldAsDirty(types.Builders)
@@ -376,12 +391,16 @@ func (b *BeaconState) addBuilderFromDepositAtEpoch(pubkey [fieldparams.BLSPubkey
 	}
 
 	if index < primitives.BuilderIndex(len(builders)) {
+		if old := builders[index]; old != nil {
+			delete(b.builderIdxMap, bytesutil.ToBytes48(old.Pubkey))
+		}
 		builders[index] = builder
 	} else {
 		gap := index - primitives.BuilderIndex(len(builders)) + 1
 		builders = append(builders, make([]*ethpb.Builder, gap)...)
 		builders[index] = builder
 	}
+	b.builderIdxMap[pubkey] = index
 	b.builders = builders
 
 	b.markFieldAsDirty(types.Builders)
@@ -653,7 +672,7 @@ func decreaseBalanceWithVal(currBalance, delta primitives.Gwei) primitives.Gwei 
 // OnboardBuildersFromPendingDeposits applies any pending builder deposits at the fork.
 // It mutates the state and prunes pending deposits accordingly.
 //
-//	<spec fn="onboard_builders_from_pending_deposits" fork="gloas">
+//	<spec fn="onboard_builders_from_pending_deposits" fork="gloas" hash="6bb266a4">
 //	def onboard_builders_from_pending_deposits(state: BeaconState) -> None:
 //	    """
 //	    Applies any pending deposit for builders, effectively
@@ -714,22 +733,27 @@ func (b *BeaconState) OnboardBuildersFromPendingDeposits() error {
 		}
 
 		builderIdx, isExistingBuilder := b.builderIndexByPubkey(pubkey)
-		if !isExistingBuilder {
-			if !helpers.IsBuilderWithdrawalCredential(deposit.WithdrawalCredentials) {
-				newPendingDeposits = append(newPendingDeposits, deposit)
-				continue
-			}
-			isPending, err := helpers.IsPendingValidator(newPendingDeposits, deposit.PublicKey)
-			if err != nil {
+		if isExistingBuilder {
+			if err := b.increaseBuilderBalance(builderIdx, deposit.Amount); err != nil {
 				return err
 			}
-			if isPending {
-				newPendingDeposits = append(newPendingDeposits, deposit)
-				continue
-			}
+			continue
 		}
 
-		if err := b.applyDepositForBuilder(deposit, builderIdx, isExistingBuilder); err != nil {
+		if !helpers.IsBuilderWithdrawalCredential(deposit.WithdrawalCredentials) {
+			newPendingDeposits = append(newPendingDeposits, deposit)
+			continue
+		}
+		isPending, err := helpers.IsPendingValidator(newPendingDeposits, deposit.PublicKey)
+		if err != nil {
+			return err
+		}
+		if isPending {
+			newPendingDeposits = append(newPendingDeposits, deposit)
+			continue
+		}
+
+		if err := b.applyDepositForNewBuilder(deposit); err != nil {
 			return err
 		}
 	}
@@ -765,10 +789,7 @@ func (b *BeaconState) OnboardBuildersFromPendingDeposits() error {
 //	    state.builders[builder_index].balance += amount
 //
 // </spec>
-func (b *BeaconState) applyDepositForBuilder(deposit *ethpb.PendingDeposit, builderIdx primitives.BuilderIndex, isExistingBuilder bool) error {
-	if isExistingBuilder {
-		return b.increaseBuilderBalance(builderIdx, deposit.Amount)
-	}
+func (b *BeaconState) applyDepositForNewBuilder(deposit *ethpb.PendingDeposit) error {
 	valid, err := helpers.IsValidDepositSignature(&ethpb.Deposit_Data{
 		PublicKey:             deposit.PublicKey,
 		WithdrawalCredentials: deposit.WithdrawalCredentials,
@@ -803,6 +824,7 @@ func (b *BeaconState) SetBuilders(val []*ethpb.Builder) error {
 	b.sharedFieldReferences[types.Builders].MinusRef()
 	b.sharedFieldReferences[types.Builders] = stateutil.NewRef(1)
 	b.builders = val
+	b.builderIdxMap = newBuilderIdxMap(val)
 	b.markFieldAsDirty(types.Builders)
 	b.rebuildTrie[types.Builders] = true
 	return nil

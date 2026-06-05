@@ -41,6 +41,7 @@ type ChainInfoFetcher interface {
 type ForkchoiceFetcher interface {
 	Ancestor(context.Context, []byte, primitives.Slot) ([]byte, error)
 	BlockHash(root [32]byte) ([32]byte, error)
+	GasLimit(root [32]byte) (uint64, error)
 	CachedHeadRoot() [32]byte
 	GetProposerHead() [32]byte
 	SetForkChoiceGenesisTime(time.Time)
@@ -48,11 +49,13 @@ type ForkchoiceFetcher interface {
 	HighestReceivedBlockSlot() primitives.Slot
 	HighestReceivedBlockRoot() [32]byte
 	HasFullNode([32]byte) bool
+	PayloadEarly([32]byte) (bool, bool)
 	FullBeatsEmpty([32]byte) bool
 	ReceivedBlocksLastEpoch() (uint64, error)
 	InsertNode(context.Context, state.BeaconState, consensus_blocks.ROBlock) error
 	InsertPayload(interfaces.ROExecutionPayloadEnvelope) error
 	ForkChoiceDump(context.Context) (*forkchoice.Dump, error)
+	ForkChoiceDumpV2(context.Context) (*forkchoice.DumpV2, error)
 	NewSlot(context.Context, primitives.Slot) error
 	ProposerBoost() [32]byte
 	RecentBlockSlot(root [32]byte) (primitives.Slot, error)
@@ -60,6 +63,7 @@ type ForkchoiceFetcher interface {
 	DependentRoot(primitives.Epoch) ([32]byte, error)
 	CanonicalNodeAtSlot(primitives.Slot) ([32]byte, bool)
 	ShouldIgnoreData(parentRoot [32]byte, dataSlot primitives.Slot) bool
+	RecordBlockForEquivocation(primitives.Slot, primitives.ValidatorIndex, [32]byte)
 }
 
 // TimeFetcher retrieves the Ethereum consensus data that's related to time.
@@ -122,7 +126,6 @@ type FinalizationFetcher interface {
 	InForkchoice([32]byte) bool
 	IsFinalized(ctx context.Context, blockRoot [32]byte) bool
 	ParentPayloadReady(interfaces.ReadOnlyBeaconBlock) bool
-	ParentPayloadGasLimit(ctx context.Context, parentBlockRoot [32]byte) (uint64, error)
 }
 
 // OptimisticModeFetcher retrieves information about optimistic status of the node.
@@ -410,28 +413,6 @@ func (s *Service) InForkchoice(root [32]byte) bool {
 	s.cfg.ForkChoiceStore.RLock()
 	defer s.cfg.ForkChoiceStore.RUnlock()
 	return s.cfg.ForkChoiceStore.HasNode(root)
-}
-
-// ParentPayloadGasLimit returns the gas limit committed by the block at
-// parentBlockRoot: bid.gas_limit for Gloas, payload header for pre-Gloas (the
-// Fulu→Gloas boundary case).
-func (s *Service) ParentPayloadGasLimit(ctx context.Context, parentBlockRoot [32]byte) (uint64, error) {
-	s.headLock.RLock()
-	if s.hasHeadState() && s.head.root == parentBlockRoot {
-		gasLimit, err := payloadGasLimit(s.head.block)
-		s.headLock.RUnlock()
-		return gasLimit, err
-	}
-	s.headLock.RUnlock()
-
-	blk, err := s.cfg.BeaconDB.Block(ctx, parentBlockRoot)
-	if err != nil {
-		return 0, errors.Wrap(err, "could not get parent block")
-	}
-	if blk == nil || blk.IsNil() {
-		return 0, errors.New("parent block not found")
-	}
-	return payloadGasLimit(blk)
 }
 
 func payloadGasLimit(blk interfaces.ReadOnlySignedBeaconBlock) (uint64, error) {

@@ -12,6 +12,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/container/trie"
 	"github.com/OffchainLabs/prysm/v7/crypto/bls"
 	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
+	enginev1 "github.com/OffchainLabs/prysm/v7/proto/engine/v1"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/testing/require"
 )
@@ -180,44 +181,120 @@ func TestBatchVerifyPendingDepositsSignatures_InvalidSignature(t *testing.T) {
 	require.Equal(t, false, verified)
 }
 
-func TestIsPendingValidator(t *testing.T) {
+func makeValidDepositRequest(t *testing.T, amount uint64) *enginev1.DepositRequest {
+	t.Helper()
 	sk, err := bls.RandKey()
 	require.NoError(t, err)
-	validDeposit := stateTesting.GeneratePendingDeposit(t, sk, 1000, [32]byte{0x01}, 0)
+	domain, err := signing.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
+	require.NoError(t, err)
+	wc := make([]byte, 32)
+	sr, err := signing.ComputeSigningRoot(&ethpb.DepositMessage{
+		PublicKey:             sk.PublicKey().Marshal(),
+		WithdrawalCredentials: wc,
+		Amount:                amount,
+	}, domain)
+	require.NoError(t, err)
+	return &enginev1.DepositRequest{
+		Pubkey:                sk.PublicKey().Marshal(),
+		WithdrawalCredentials: wc,
+		Amount:                amount,
+		Signature:             sk.Sign(sr[:]).Marshal(),
+	}
+}
 
-	t.Run("valid signature returns true", func(t *testing.T) {
-		ok, err := helpers.IsPendingValidator([]*ethpb.PendingDeposit{validDeposit}, validDeposit.PublicKey)
-		require.NoError(t, err)
-		require.Equal(t, true, ok)
-	})
+func makeInvalidDepositRequest(t *testing.T, amount uint64) *enginev1.DepositRequest {
+	t.Helper()
+	sk, err := bls.RandKey()
+	require.NoError(t, err)
+	return &enginev1.DepositRequest{
+		Pubkey:                sk.PublicKey().Marshal(),
+		WithdrawalCredentials: make([]byte, 32),
+		Amount:                amount,
+		Signature:             make([]byte, 96),
+	}
+}
 
-	t.Run("invalid signature returns false", func(t *testing.T) {
-		invalid := &ethpb.PendingDeposit{
-			PublicKey:             validDeposit.PublicKey,
-			WithdrawalCredentials: validDeposit.WithdrawalCredentials,
-			Amount:                validDeposit.Amount,
-			Signature:             make([]byte, fieldparams.BLSSignatureLength),
-		}
-		ok, err := helpers.IsPendingValidator([]*ethpb.PendingDeposit{invalid}, validDeposit.PublicKey)
-		require.NoError(t, err)
-		require.Equal(t, false, ok)
-	})
+func TestBatchVerifyDepositRequestSignatures_Empty(t *testing.T) {
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), nil)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(invalid))
+}
 
-	t.Run("unknown pubkey returns false", func(t *testing.T) {
-		ok, err := helpers.IsPendingValidator([]*ethpb.PendingDeposit{validDeposit}, []byte{9, 9, 9})
-		require.NoError(t, err)
-		require.Equal(t, false, ok)
-	})
+func TestBatchVerifyDepositRequestSignatures_AllValid(t *testing.T) {
+	reqs := []*enginev1.DepositRequest{
+		makeValidDepositRequest(t, 100),
+		makeValidDepositRequest(t, 200),
+		makeValidDepositRequest(t, 300),
+		makeValidDepositRequest(t, 400),
+	}
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), reqs)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(invalid))
+}
 
-	t.Run("nil entry skipped", func(t *testing.T) {
-		ok, err := helpers.IsPendingValidator([]*ethpb.PendingDeposit{nil, validDeposit}, validDeposit.PublicKey)
-		require.NoError(t, err)
-		require.Equal(t, true, ok)
-	})
+func TestBatchVerifyDepositRequestSignatures_AllInvalid(t *testing.T) {
+	reqs := []*enginev1.DepositRequest{
+		makeInvalidDepositRequest(t, 100),
+		makeInvalidDepositRequest(t, 200),
+		makeInvalidDepositRequest(t, 300),
+	}
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), reqs)
+	require.NoError(t, err)
+	require.DeepEqual(t, []int{0, 1, 2}, invalid)
+}
 
-	t.Run("empty slice returns false", func(t *testing.T) {
-		ok, err := helpers.IsPendingValidator(nil, validDeposit.PublicKey)
-		require.NoError(t, err)
-		require.Equal(t, false, ok)
-	})
+func TestBatchVerifyDepositRequestSignatures_SingleValid(t *testing.T) {
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), []*enginev1.DepositRequest{makeValidDepositRequest(t, 1)})
+	require.NoError(t, err)
+	require.Equal(t, 0, len(invalid))
+}
+
+func TestBatchVerifyDepositRequestSignatures_SingleInvalid(t *testing.T) {
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), []*enginev1.DepositRequest{makeInvalidDepositRequest(t, 1)})
+	require.NoError(t, err)
+	require.DeepEqual(t, []int{0}, invalid)
+}
+
+func TestBatchVerifyDepositRequestSignatures_MixedDC(t *testing.T) {
+	reqs := []*enginev1.DepositRequest{
+		makeInvalidDepositRequest(t, 1),
+		makeValidDepositRequest(t, 2),
+		makeValidDepositRequest(t, 3),
+		makeInvalidDepositRequest(t, 4),
+		makeValidDepositRequest(t, 5),
+		makeValidDepositRequest(t, 6),
+		makeInvalidDepositRequest(t, 7),
+		makeValidDepositRequest(t, 8),
+	}
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), reqs)
+	require.NoError(t, err)
+	require.DeepEqual(t, []int{0, 3, 6}, invalid)
+}
+
+func TestBatchVerifyDepositRequestSignatures_OneBadInLargeBatch(t *testing.T) {
+	const n = 128
+	reqs := make([]*enginev1.DepositRequest, n)
+	for i := range n {
+		reqs[i] = makeValidDepositRequest(t, uint64(i+1))
+	}
+	const badIdx = 11
+	reqs[badIdx] = makeInvalidDepositRequest(t, badIdx+1)
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), reqs)
+	require.NoError(t, err)
+	require.DeepEqual(t, []int{badIdx}, invalid)
+}
+
+func TestBatchVerifyDepositRequestSignatures_MultipleBadAcrossSubtrees(t *testing.T) {
+	const n = 128
+	reqs := make([]*enginev1.DepositRequest, n)
+	for i := range n {
+		reqs[i] = makeValidDepositRequest(t, uint64(i+1))
+	}
+	badIdxs := []int{5, 47, 99, 120}
+	for _, idx := range badIdxs {
+		reqs[idx] = makeInvalidDepositRequest(t, uint64(idx+1))
+	}
+	invalid, err := helpers.BatchVerifyDepositRequestSignatures(t.Context(), reqs)
+	require.NoError(t, err)
+	require.DeepEqual(t, badIdxs, invalid)
 }

@@ -29,7 +29,7 @@ func ProcessDepositRequests(ctx context.Context, beaconState state.BeaconState, 
 
 // processDepositRequest processes the specific deposit request
 //
-//	<spec fn="process_deposit_request" fork="gloas">
+//	<spec fn="process_deposit_request" fork="gloas" hash="a6fff32f">
 //	def process_deposit_request(state: BeaconState, deposit_request: DepositRequest) -> None:
 //	    # [New in Gloas:EIP7732]
 //	    builder_pubkeys = [b.pubkey for b in state.builders]

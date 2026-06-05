@@ -1209,15 +1209,6 @@
         epoch: Epoch
     </spec>
 
-- name: ForkChoiceNode#gloas
-  sources: []
-  spec: |
-    <spec ssz_object="ForkChoiceNode" fork="gloas" hash="755a4b34">
-    class ForkChoiceNode(Container):
-        root: Root
-        payload_status: PayloadStatus  # One of PAYLOAD_STATUS_* values
-    </spec>
-
 - name: ForkData#phase0
   sources:
     - file: proto/prysm/v1alpha1/beacon_state.proto
@@ -1622,13 +1613,13 @@
 - name: ProposerPreferences#gloas
   sources: []
   spec: |
-    <spec ssz_object="ProposerPreferences" fork="gloas" hash="5ef93db5">
+    <spec ssz_object="ProposerPreferences" fork="gloas" hash="305cd154">
     class ProposerPreferences(Container):
         dependent_root: Root
         proposal_slot: Slot
         validator_index: ValidatorIndex
         fee_recipient: ExecutionAddress
-        gas_limit: uint64
+        target_gas_limit: uint64
     </spec>
 
 - name: ProposerSlashing#phase0
