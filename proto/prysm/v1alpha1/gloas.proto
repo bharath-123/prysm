@@ -494,7 +494,7 @@ message DataColumnSidecarGloas {
 // `aot_data_column_sidecar_{subnet_id}` subnet by ticket holders ahead of block
 // time. Unlike DataColumnSidecarGloas (the merged, block-bound stored form), this
 // sidecar carries its own kzg_commitments plus the ticket identity (ticket_id,
-// target_slot) and the BLS signature over the original AOTBlobInfo.
+// target_slot) and the BLS signature over the original AotBlobInfoV1.
 // Note: defined here in gloas.proto (rather than a new heze.proto) to avoid the
 // hard-fork proto boilerplate.
 //

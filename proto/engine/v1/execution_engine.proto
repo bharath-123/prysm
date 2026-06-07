@@ -340,7 +340,7 @@ message Blob {
   bytes data = 1 [ (ethereum.eth.ext.ssz_size) = "blob.size" ];
 }
 
-// AOTBlobInfo contains the metadata for an AOT (ahead-of-time) blob submission
+// AotBlobInfoV1 contains the metadata for an AOT (ahead-of-time) blob submission
 // associated with a blob ticket, introduced by the Blob Streaming EIP. The
 // ticket holder signs this (see SignedAOTBlobInfo / the blob_info_signature on
 // AOTDataColumnSidecar) before computing and distributing the corresponding
@@ -351,7 +351,7 @@ message Blob {
 //     ticket_id: TicketId
 //     target_slot: Slot
 //     blob_kzg_commitments: List[KZGCommitment, MAX_AOT_BLOB_COMMITMENTS_PER_BLOCK]
-message AOTBlobInfo {
+message AotBlobInfoV1 {
   uint64 ticket_id = 1;
   uint64 target_slot = 2 [
     (ethereum.eth.ext.cast_type) =
@@ -361,6 +361,22 @@ message AOTBlobInfo {
     (ethereum.eth.ext.ssz_size) = "?,48",
     (ethereum.eth.ext.ssz_max) = "max_aot_blob_commitments.size"
   ];
+}
+
+// AotBlobBundleV1 describes a single AOT (ahead-of-time) blob whose commitment and
+// cell proofs are included in the execution payload, returned by engine_getPayload
+// alongside the payload and the (JIT-only) BlobsBundleV2. Unlike JIT blobs, the EL
+// does not hold the AOT blob data; the CL is responsible for its data availability
+// via the sidecar subnets. JSON-only transport from the EL, so no ssz tags.
+//
+// Engine API (execution-apis blob-streaming.md, AotBlobBundleV1):
+//   versionedHash: DATA, 32 Bytes
+//   kzgCommitment: DATA, 48 Bytes
+//   kzgProofs:     Array of KZGProof (48 Bytes each), exactly CELLS_PER_EXT_BLOB proofs
+message AotBlobBundleV1 {
+  bytes versioned_hash = 1;
+  bytes kzg_commitment = 2;
+  repeated bytes kzg_proofs = 3;
 }
 
 // BlobAndProofV2 consists of the blob and the cell proofs for each cell in the

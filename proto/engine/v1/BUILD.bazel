@@ -47,7 +47,7 @@ ssz_gen_marshal(
         "BlindedBlobsBundle",
         "BlobsBundle",
         "BlobsBundleV2",
-        "AOTBlobInfo",
+        "AotBlobInfoV1",
         "Withdrawal",
         "WithdrawalRequest",
         "DepositRequest",

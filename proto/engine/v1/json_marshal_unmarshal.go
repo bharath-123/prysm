@@ -818,12 +818,13 @@ func (p *PayloadAttributesV3) UnmarshalJSON(enc []byte) error {
 }
 
 type payloadAttributesV4JSON struct {
-	Timestamp             hexutil.Uint64 `json:"timestamp"`
-	PrevRandao            hexutil.Bytes  `json:"prevRandao"`
-	SuggestedFeeRecipient hexutil.Bytes  `json:"suggestedFeeRecipient"`
-	Withdrawals           []*Withdrawal  `json:"withdrawals"`
-	ParentBeaconBlockRoot hexutil.Bytes  `json:"parentBeaconBlockRoot"`
-	SlotNumber            hexutil.Uint64 `json:"slotNumber"`
+	Timestamp                   hexutil.Uint64    `json:"timestamp"`
+	PrevRandao                  hexutil.Bytes     `json:"prevRandao"`
+	SuggestedFeeRecipient       hexutil.Bytes     `json:"suggestedFeeRecipient"`
+	Withdrawals                 []*Withdrawal     `json:"withdrawals"`
+	ParentBeaconBlockRoot       hexutil.Bytes     `json:"parentBeaconBlockRoot"`
+	SlotNumber                  hexutil.Uint64    `json:"slotNumber"`
+	AvailableAotBlobCommitments [][]hexutil.Bytes `json:"availableAotBlobCommitments"`
 }
 
 func (p *PayloadAttributesV4) MarshalJSON() ([]byte, error) {
@@ -832,13 +833,26 @@ func (p *PayloadAttributesV4) MarshalJSON() ([]byte, error) {
 		withdrawals = make([]*Withdrawal, 0)
 	}
 
+	// Blob Streaming POC: availableAotBlobCommitments is a list-of-lists of blob
+	// versioned hashes (one inner list per available AOT bundle). Always serialize
+	// as [] (never null) to match the withdrawals style.
+	aotCommitments := make([][]hexutil.Bytes, len(p.AvailableAotBlobCommitments))
+	for i, bundle := range p.AvailableAotBlobCommitments {
+		hashes := make([]hexutil.Bytes, len(bundle.GetVersionedHashes()))
+		for j, h := range bundle.GetVersionedHashes() {
+			hashes[j] = h
+		}
+		aotCommitments[i] = hashes
+	}
+
 	return json.Marshal(payloadAttributesV4JSON{
-		Timestamp:             hexutil.Uint64(p.Timestamp),
-		PrevRandao:            p.PrevRandao,
-		SuggestedFeeRecipient: p.SuggestedFeeRecipient,
-		Withdrawals:           withdrawals,
-		ParentBeaconBlockRoot: p.ParentBeaconBlockRoot,
-		SlotNumber:            hexutil.Uint64(p.SlotNumber),
+		Timestamp:                   hexutil.Uint64(p.Timestamp),
+		PrevRandao:                  p.PrevRandao,
+		SuggestedFeeRecipient:       p.SuggestedFeeRecipient,
+		Withdrawals:                 withdrawals,
+		ParentBeaconBlockRoot:       p.ParentBeaconBlockRoot,
+		SlotNumber:                  hexutil.Uint64(p.SlotNumber),
+		AvailableAotBlobCommitments: aotCommitments,
 	})
 }
 
@@ -858,6 +872,16 @@ func (p *PayloadAttributesV4) UnmarshalJSON(enc []byte) error {
 	p.Withdrawals = withdrawals
 	p.ParentBeaconBlockRoot = dec.ParentBeaconBlockRoot
 	p.SlotNumber = uint64(dec.SlotNumber)
+
+	aotCommitments := make([]*VersionedHashList, len(dec.AvailableAotBlobCommitments))
+	for i, bundle := range dec.AvailableAotBlobCommitments {
+		hashes := make([][]byte, len(bundle))
+		for j, h := range bundle {
+			hashes[j] = h
+		}
+		aotCommitments[i] = &VersionedHashList{VersionedHashes: hashes}
+	}
+	p.AvailableAotBlobCommitments = aotCommitments
 	return nil
 }
 

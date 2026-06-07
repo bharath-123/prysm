@@ -15,13 +15,14 @@ var (
 )
 
 type data struct {
-	version               int
-	timeStamp             uint64
-	prevRandao            []byte
-	suggestedFeeRecipient []byte
-	withdrawals           []*enginev1.Withdrawal
-	parentBeaconBlockRoot []byte
-	slotNumber            uint64
+	version                     int
+	timeStamp                   uint64
+	prevRandao                  []byte
+	suggestedFeeRecipient       []byte
+	withdrawals                 []*enginev1.Withdrawal
+	parentBeaconBlockRoot       []byte
+	slotNumber                  uint64
+	availableAotBlobCommitments []*enginev1.VersionedHashList
 }
 
 var (
@@ -103,13 +104,14 @@ func initPayloadAttributeFromV4(a *enginev1.PayloadAttributesV4) (Attributer, er
 	}
 
 	return &data{
-		version:               version.Gloas,
-		prevRandao:            a.PrevRandao,
-		timeStamp:             a.Timestamp,
-		suggestedFeeRecipient: a.SuggestedFeeRecipient,
-		withdrawals:           a.Withdrawals,
-		parentBeaconBlockRoot: a.ParentBeaconBlockRoot,
-		slotNumber:            a.SlotNumber,
+		version:                     version.Gloas,
+		prevRandao:                  a.PrevRandao,
+		timeStamp:                   a.Timestamp,
+		suggestedFeeRecipient:       a.SuggestedFeeRecipient,
+		withdrawals:                 a.Withdrawals,
+		parentBeaconBlockRoot:       a.ParentBeaconBlockRoot,
+		slotNumber:                  a.SlotNumber,
+		availableAotBlobCommitments: a.AvailableAotBlobCommitments,
 	}, nil
 }
 
