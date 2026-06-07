@@ -354,6 +354,16 @@ type GetPayloadV6ResponseJson struct {
 	BlobsBundle           *BlobBundleV2JSON          `json:"blobsBundle"`
 	ShouldOverrideBuilder bool                       `json:"shouldOverrideBuilder"`
 	ExecutionRequests     []hexutil.Bytes            `json:"executionRequests"`
+	AotBlobInfo           []*AotBlobBundleV1JSON     `json:"aotBlobInfo"`
+}
+
+// AotBlobBundleV1JSON is the JSON form of an AotBlobBundleV1 entry in the
+// engine_getPayload response (Blob Streaming): the AOT blob's versioned hash,
+// KZG commitment, and per-cell KZG proofs.
+type AotBlobBundleV1JSON struct {
+	VersionedHash hexutil.Bytes   `json:"versionedHash"`
+	KzgCommitment hexutil.Bytes   `json:"kzgCommitment"`
+	KzgProofs     []hexutil.Bytes `json:"kzgProofs"`
 }
 
 // ExecutionPayloadBodyV2 represents the engine API ExecutionPayloadBodyV2 type (Amsterdam).
@@ -1727,6 +1737,23 @@ func (e *ExecutionBundleGloas) UnmarshalJSON(enc []byte) error {
 		return err
 	}
 	e.Value = bytesutil.PadTo(bytesutil.ReverseByteOrder(v.Bytes()), fieldparams.RootLength)
+
+	// AOT blob bundle (Blob Streaming): decode before the BlobsBundle early return so
+	// a payload with AOT blobs but no JIT blobs still populates it. Defaults to an
+	// empty (non-nil) slice when the EL omits aotBlobInfo / sends no AOT blobs.
+	aotBlobBundle := make([]*AotBlobBundleV1, len(dec.AotBlobInfo))
+	for i, b := range dec.AotBlobInfo {
+		proofs := make([][]byte, len(b.KzgProofs))
+		for j, p := range b.KzgProofs {
+			proofs[j] = p
+		}
+		aotBlobBundle[i] = &AotBlobBundleV1{
+			VersionedHash: b.VersionedHash,
+			KzgCommitment: b.KzgCommitment,
+			KzgProofs:     proofs,
+		}
+	}
+	e.AotBlobBundle = aotBlobBundle
 
 	if dec.BlobsBundle == nil {
 		return nil

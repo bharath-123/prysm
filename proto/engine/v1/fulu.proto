@@ -25,4 +25,10 @@ message ExecutionBundleGloas {
   BlobsBundleV2 blobs_bundle = 3;
   bool should_override_builder = 4;
   repeated bytes execution_requests = 5;
+  // aot_blob_bundle carries the AOT (ahead-of-time) blob commitments + cell proofs
+  // included in the payload, returned by engine_getPayload (Blob Streaming). The
+  // blobs_bundle above is JIT-only; this is the AOT counterpart. Empty when the
+  // payload includes no AOT blobs (e.g. the AOT blob txs are not in the mempool).
+  // Wire/JSON key in the getPayload response: aotBlobInfo.
+  repeated AotBlobBundleV1 aot_blob_bundle = 6;
 }
