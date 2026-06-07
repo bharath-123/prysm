@@ -15,7 +15,7 @@ func (e *ExecutionPayloadBid) MarshalSSZ() ([]byte, error) {
 // MarshalSSZTo ssz marshals the ExecutionPayloadBid object to a target array
 func (e *ExecutionPayloadBid) MarshalSSZTo(buf []byte) (dst []byte, err error) {
 	dst = buf
-	offset := int(224)
+	offset := int(228)
 
 	// Field (0) 'ParentBlockHash'
 	if size := len(e.ParentBlockHash); size != 32 {
@@ -78,6 +78,10 @@ func (e *ExecutionPayloadBid) MarshalSSZTo(buf []byte) (dst []byte, err error) {
 	}
 	dst = append(dst, e.ExecutionRequestsRoot...)
 
+	// Offset (12) 'AotBlobKzgCommitmentsRoots'
+	dst = ssz.WriteOffset(dst, offset)
+	offset += len(e.AotBlobKzgCommitmentsRoots) * 32
+
 	// Field (10) 'BlobKzgCommitments'
 	if size := len(e.BlobKzgCommitments); size > 4096 {
 		err = ssz.ErrListTooBigFn("--.BlobKzgCommitments", size, 4096)
@@ -91,6 +95,19 @@ func (e *ExecutionPayloadBid) MarshalSSZTo(buf []byte) (dst []byte, err error) {
 		dst = append(dst, e.BlobKzgCommitments[ii]...)
 	}
 
+	// Field (12) 'AotBlobKzgCommitmentsRoots'
+	if size := len(e.AotBlobKzgCommitmentsRoots); size > 4096 {
+		err = ssz.ErrListTooBigFn("--.AotBlobKzgCommitmentsRoots", size, 4096)
+		return
+	}
+	for ii := 0; ii < len(e.AotBlobKzgCommitmentsRoots); ii++ {
+		if size := len(e.AotBlobKzgCommitmentsRoots[ii]); size != 32 {
+			err = ssz.ErrBytesLengthFn("--.AotBlobKzgCommitmentsRoots[ii]", size, 32)
+			return
+		}
+		dst = append(dst, e.AotBlobKzgCommitmentsRoots[ii]...)
+	}
+
 	return
 }
 
@@ -98,12 +115,12 @@ func (e *ExecutionPayloadBid) MarshalSSZTo(buf []byte) (dst []byte, err error) {
 func (e *ExecutionPayloadBid) UnmarshalSSZ(buf []byte) error {
 	var err error
 	size := uint64(len(buf))
-	if size < 224 {
+	if size < 228 {
 		return ssz.ErrSize
 	}
 
 	tail := buf
-	var o10 uint64
+	var o10, o12 uint64
 
 	// Field (0) 'ParentBlockHash'
 	if cap(e.ParentBlockHash) == 0 {
@@ -155,7 +172,7 @@ func (e *ExecutionPayloadBid) UnmarshalSSZ(buf []byte) error {
 		return ssz.ErrOffset
 	}
 
-	if o10 != 224 {
+	if o10 != 228 {
 		return ssz.ErrInvalidVariableOffset
 	}
 
@@ -165,9 +182,14 @@ func (e *ExecutionPayloadBid) UnmarshalSSZ(buf []byte) error {
 	}
 	e.ExecutionRequestsRoot = append(e.ExecutionRequestsRoot, buf[192:224]...)
 
+	// Offset (12) 'AotBlobKzgCommitmentsRoots'
+	if o12 = ssz.ReadOffset(buf[224:228]); o12 > size || o10 > o12 {
+		return ssz.ErrOffset
+	}
+
 	// Field (10) 'BlobKzgCommitments'
 	{
-		buf = tail[o10:]
+		buf = tail[o10:o12]
 		num, err := ssz.DivideInt2(len(buf), 48, 4096)
 		if err != nil {
 			return err
@@ -180,15 +202,34 @@ func (e *ExecutionPayloadBid) UnmarshalSSZ(buf []byte) error {
 			e.BlobKzgCommitments[ii] = append(e.BlobKzgCommitments[ii], buf[ii*48:(ii+1)*48]...)
 		}
 	}
+
+	// Field (12) 'AotBlobKzgCommitmentsRoots'
+	{
+		buf = tail[o12:]
+		num, err := ssz.DivideInt2(len(buf), 32, 4096)
+		if err != nil {
+			return err
+		}
+		e.AotBlobKzgCommitmentsRoots = make([][]byte, num)
+		for ii := 0; ii < num; ii++ {
+			if cap(e.AotBlobKzgCommitmentsRoots[ii]) == 0 {
+				e.AotBlobKzgCommitmentsRoots[ii] = make([]byte, 0, len(buf[ii*32:(ii+1)*32]))
+			}
+			e.AotBlobKzgCommitmentsRoots[ii] = append(e.AotBlobKzgCommitmentsRoots[ii], buf[ii*32:(ii+1)*32]...)
+		}
+	}
 	return err
 }
 
 // SizeSSZ returns the ssz encoded size in bytes for the ExecutionPayloadBid object
 func (e *ExecutionPayloadBid) SizeSSZ() (size int) {
-	size = 224
+	size = 228
 
 	// Field (10) 'BlobKzgCommitments'
 	size += len(e.BlobKzgCommitments) * 48
+
+	// Field (12) 'AotBlobKzgCommitmentsRoots'
+	size += len(e.AotBlobKzgCommitmentsRoots) * 32
 
 	return
 }
@@ -277,6 +318,25 @@ func (e *ExecutionPayloadBid) HashTreeRootWith(hh *ssz.Hasher) (err error) {
 		return
 	}
 	hh.PutBytes(e.ExecutionRequestsRoot)
+
+	// Field (12) 'AotBlobKzgCommitmentsRoots'
+	{
+		if size := len(e.AotBlobKzgCommitmentsRoots); size > 4096 {
+			err = ssz.ErrListTooBigFn("--.AotBlobKzgCommitmentsRoots", size, 4096)
+			return
+		}
+		subIndx := hh.Index()
+		for _, i := range e.AotBlobKzgCommitmentsRoots {
+			if len(i) != 32 {
+				err = ssz.ErrBytesLength
+				return
+			}
+			hh.Append(i)
+		}
+
+		numItems := uint64(len(e.AotBlobKzgCommitmentsRoots))
+		hh.MerkleizeWithMixin(subIndx, numItems, 4096)
+	}
 
 	hh.Merkleize(indx)
 	return
