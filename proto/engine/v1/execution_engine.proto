@@ -340,7 +340,7 @@ message Blob {
   bytes data = 1 [ (ethereum.eth.ext.ssz_size) = "blob.size" ];
 }
 
-// AotBlobInfoV1 contains the metadata for an AOT (ahead-of-time) blob submission
+// AOTBlobInfo contains the metadata for an AOT (ahead-of-time) blob submission
 // associated with a blob ticket, introduced by the Blob Streaming EIP. The
 // ticket holder signs this (see SignedAOTBlobInfo / the blob_info_signature on
 // AOTDataColumnSidecar) before computing and distributing the corresponding
@@ -351,7 +351,7 @@ message Blob {
 //     ticket_id: TicketId
 //     target_slot: Slot
 //     blob_kzg_commitments: List[KZGCommitment, MAX_AOT_BLOB_COMMITMENTS_PER_BLOCK]
-message AotBlobInfoV1 {
+message AOTBlobInfo {
   uint64 ticket_id = 1;
   uint64 target_slot = 2 [
     (ethereum.eth.ext.cast_type) =
