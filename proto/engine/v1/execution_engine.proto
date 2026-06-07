@@ -226,6 +226,15 @@ message PayloadAttributesV3 {
   bytes parent_beacon_block_root = 5 [ (ethereum.eth.ext.ssz_size) = "32" ];
 }
 
+// VersionedHashList wraps one AOT bundle's blob versioned hashes so that
+// PayloadAttributesV4.available_aot_blob_commitments can express a list-of-lists
+// (one inner list per available AOT bundle). proto3 has no repeated-of-repeated,
+// hence the wrapper. JSON/SSZ generation is not used for PayloadAttributes (it is
+// sent to the EL as JSON), so no ssz tags are needed here.
+message VersionedHashList {
+  repeated bytes versioned_hashes = 1;
+}
+
 // PayloadAttributesV4 extends V3 with slot_number (Amsterdam/EIP-7843).
 message PayloadAttributesV4 {
   uint64 timestamp = 1;
@@ -235,6 +244,11 @@ message PayloadAttributesV4 {
       [ (ethereum.eth.ext.ssz_max) = "withdrawal.size" ];
   bytes parent_beacon_block_root = 5 [ (ethereum.eth.ext.ssz_size) = "32" ];
   uint64 slot_number = 6;
+  // available_aot_blob_commitments carries, per available AOT bundle, the blob
+  // versioned hashes whose custody this node has fulfilled (Blob Streaming POC:
+  // a list-of-lists of versioned hashes, sourced from the AOT data column cache).
+  // Wire/JSON field name: availableAotBlobCommitments.
+  repeated VersionedHashList available_aot_blob_commitments = 7;
 }
 
 message PayloadStatus {

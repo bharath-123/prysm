@@ -47,6 +47,9 @@ type AotDataColumnsIdent struct {
 // ticket_id is deliberately NOT used as a key: it is only a gossip-propagation
 // construct and is not observable on-chain. The bid references AOT bundles solely by
 // their commitment-list roots.
+//
+// TODO - The AotDataColumnCache must be persisted in disk to survive node restarts since
+// the DA check for AOT data columns is important for attesters. 
 type AotDataColumnCache struct {
 	mu      sync.RWMutex
 	bundles map[aotBundleKey]*aotBundle
