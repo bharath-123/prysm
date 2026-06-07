@@ -2197,6 +2197,66 @@ func (x *AOTBlobInfo) GetBlobKzgCommitments() [][]byte {
 	return nil
 }
 
+type AotBlobBundleV1 struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VersionedHash []byte                 `protobuf:"bytes,1,opt,name=versioned_hash,json=versionedHash,proto3" json:"versioned_hash,omitempty"`
+	KzgCommitment []byte                 `protobuf:"bytes,2,opt,name=kzg_commitment,json=kzgCommitment,proto3" json:"kzg_commitment,omitempty"`
+	KzgProofs     [][]byte               `protobuf:"bytes,3,rep,name=kzg_proofs,json=kzgProofs,proto3" json:"kzg_proofs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AotBlobBundleV1) Reset() {
+	*x = AotBlobBundleV1{}
+	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AotBlobBundleV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AotBlobBundleV1) ProtoMessage() {}
+
+func (x *AotBlobBundleV1) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AotBlobBundleV1.ProtoReflect.Descriptor instead.
+func (*AotBlobBundleV1) Descriptor() ([]byte, []int) {
+	return file_proto_engine_v1_execution_engine_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *AotBlobBundleV1) GetVersionedHash() []byte {
+	if x != nil {
+		return x.VersionedHash
+	}
+	return nil
+}
+
+func (x *AotBlobBundleV1) GetKzgCommitment() []byte {
+	if x != nil {
+		return x.KzgCommitment
+	}
+	return nil
+}
+
+func (x *AotBlobBundleV1) GetKzgProofs() [][]byte {
+	if x != nil {
+		return x.KzgProofs
+	}
+	return nil
+}
+
 type BlobAndProof struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Blob          []byte                 `protobuf:"bytes,1,opt,name=blob,proto3" json:"blob,omitempty" ssz-size:"131072"`
@@ -2207,7 +2267,7 @@ type BlobAndProof struct {
 
 func (x *BlobAndProof) Reset() {
 	*x = BlobAndProof{}
-	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[23]
+	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2219,7 +2279,7 @@ func (x *BlobAndProof) String() string {
 func (*BlobAndProof) ProtoMessage() {}
 
 func (x *BlobAndProof) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[23]
+	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2232,7 +2292,7 @@ func (x *BlobAndProof) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlobAndProof.ProtoReflect.Descriptor instead.
 func (*BlobAndProof) Descriptor() ([]byte, []int) {
-	return file_proto_engine_v1_execution_engine_proto_rawDescGZIP(), []int{23}
+	return file_proto_engine_v1_execution_engine_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *BlobAndProof) GetBlob() []byte {
@@ -2259,7 +2319,7 @@ type BlobAndProofV2 struct {
 
 func (x *BlobAndProofV2) Reset() {
 	*x = BlobAndProofV2{}
-	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[24]
+	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2271,7 +2331,7 @@ func (x *BlobAndProofV2) String() string {
 func (*BlobAndProofV2) ProtoMessage() {}
 
 func (x *BlobAndProofV2) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[24]
+	mi := &file_proto_engine_v1_execution_engine_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2284,7 +2344,7 @@ func (x *BlobAndProofV2) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlobAndProofV2.ProtoReflect.Descriptor instead.
 func (*BlobAndProofV2) Descriptor() ([]byte, []int) {
-	return file_proto_engine_v1_execution_engine_proto_rawDescGZIP(), []int{24}
+	return file_proto_engine_v1_execution_engine_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *BlobAndProofV2) GetBlob() []byte {
@@ -2811,6 +2871,14 @@ var file_proto_engine_v1_execution_engine_proto_rawDesc = []byte{
 	0x6e, 0x74, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0c, 0x42, 0x10, 0x8a, 0xb5, 0x18, 0x04, 0x3f,
 	0x2c, 0x34, 0x38, 0x92, 0xb5, 0x18, 0x04, 0x34, 0x30, 0x39, 0x36, 0x52, 0x12, 0x62, 0x6c, 0x6f,
 	0x62, 0x4b, 0x7a, 0x67, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x22,
+	0x7e, 0x0a, 0x0f, 0x41, 0x6f, 0x74, 0x42, 0x6c, 0x6f, 0x62, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65,
+	0x56, 0x31, 0x12, 0x25, 0x0a, 0x0e, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x65, 0x64, 0x5f,
+	0x68, 0x61, 0x73, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0d, 0x76, 0x65, 0x72, 0x73,
+	0x69, 0x6f, 0x6e, 0x65, 0x64, 0x48, 0x61, 0x73, 0x68, 0x12, 0x25, 0x0a, 0x0e, 0x6b, 0x7a, 0x67,
+	0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x6d, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0c, 0x52, 0x0d, 0x6b, 0x7a, 0x67, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x6d, 0x65, 0x6e, 0x74,
+	0x12, 0x1d, 0x0a, 0x0a, 0x6b, 0x7a, 0x67, 0x5f, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x73, 0x18, 0x03,
+	0x20, 0x03, 0x28, 0x0c, 0x52, 0x09, 0x6b, 0x7a, 0x67, 0x50, 0x72, 0x6f, 0x6f, 0x66, 0x73, 0x22,
 	0x53, 0x0a, 0x0c, 0x42, 0x6c, 0x6f, 0x62, 0x41, 0x6e, 0x64, 0x50, 0x72, 0x6f, 0x6f, 0x66, 0x12,
 	0x1e, 0x0a, 0x04, 0x62, 0x6c, 0x6f, 0x62, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x42, 0x0a, 0x8a,
 	0xb5, 0x18, 0x06, 0x31, 0x33, 0x31, 0x30, 0x37, 0x32, 0x52, 0x04, 0x62, 0x6c, 0x6f, 0x62, 0x12,
@@ -2848,7 +2916,7 @@ func file_proto_engine_v1_execution_engine_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_engine_v1_execution_engine_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_engine_v1_execution_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_proto_engine_v1_execution_engine_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_proto_engine_v1_execution_engine_proto_goTypes = []any{
 	(PayloadStatus_Status)(0),                            // 0: ethereum.engine.v1.PayloadStatus.Status
 	(*ExecutionPayload)(nil),                             // 1: ethereum.engine.v1.ExecutionPayload
@@ -2874,8 +2942,9 @@ var file_proto_engine_v1_execution_engine_proto_goTypes = []any{
 	(*BlobsBundleV2)(nil),                                // 21: ethereum.engine.v1.BlobsBundleV2
 	(*Blob)(nil),                                         // 22: ethereum.engine.v1.Blob
 	(*AOTBlobInfo)(nil),                                  // 23: ethereum.engine.v1.AOTBlobInfo
-	(*BlobAndProof)(nil),                                 // 24: ethereum.engine.v1.BlobAndProof
-	(*BlobAndProofV2)(nil),                               // 25: ethereum.engine.v1.BlobAndProofV2
+	(*AotBlobBundleV1)(nil),                              // 24: ethereum.engine.v1.AotBlobBundleV1
+	(*BlobAndProof)(nil),                                 // 25: ethereum.engine.v1.BlobAndProof
+	(*BlobAndProofV2)(nil),                               // 26: ethereum.engine.v1.BlobAndProofV2
 }
 var file_proto_engine_v1_execution_engine_proto_depIdxs = []int32{
 	19, // 0: ethereum.engine.v1.ExecutionPayloadCapella.withdrawals:type_name -> ethereum.engine.v1.Withdrawal
@@ -2911,7 +2980,7 @@ func file_proto_engine_v1_execution_engine_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_proto_engine_v1_execution_engine_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
