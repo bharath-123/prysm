@@ -6,6 +6,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/async/event"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/cache"
 	statefeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/state"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/das"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db/filesystem"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/execution"
@@ -68,6 +69,15 @@ func WithChainStartFetcher(f execution.ChainStartFetcher) Option {
 func WithExecutionEngineCaller(c execution.EngineCaller) Option {
 	return func(s *Service) error {
 		s.cfg.ExecutionEngineCaller = c
+		return nil
+	}
+}
+
+// WithAotDataColumnCache sets the AOT data column staging cache used to populate
+// PayloadAttributes.AvailableAotBlobCommitments at FCU/build time (Blob Streaming).
+func WithAotDataColumnCache(c *das.AotDataColumnCache) Option {
+	return func(s *Service) error {
+		s.cfg.AotDataColumnCache = c
 		return nil
 	}
 }

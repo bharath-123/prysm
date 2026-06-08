@@ -145,18 +145,40 @@ func (s *Service) getLatePayloadAttribute(ctx context.Context, st state.ReadOnly
 	}
 
 	attr, err := payloadattribute.New(&enginev1.PayloadAttributesV4{
-		Timestamp:             uint64(t.Unix()),
-		PrevRandao:            prevRando,
-		SuggestedFeeRecipient: val.FeeRecipient[:],
-		Withdrawals:           withdrawals,
-		ParentBeaconBlockRoot: headRoot,
-		SlotNumber:            uint64(slot),
+		Timestamp:                   uint64(t.Unix()),
+		PrevRandao:                  prevRando,
+		SuggestedFeeRecipient:       val.FeeRecipient[:],
+		Withdrawals:                 withdrawals,
+		ParentBeaconBlockRoot:       headRoot,
+		SlotNumber:                  uint64(slot),
+		AvailableAotBlobCommitments: s.availableAotBlobCommitments(ctx),
 	})
 	if err != nil {
 		log.WithError(err).Error("Could not get payload attribute")
 		return emptyAttri
 	}
 	return attr
+}
+
+// availableAotBlobCommitments returns the AOT blob versioned hashes for the bundles this
+// node fully custodies, for PayloadAttributes.AvailableAotBlobCommitments (Blob Streaming).
+// Errors are logged and swallowed (returning nil) so AOT availability never blocks an FCU;
+// a nil result marshals to an empty list.
+func (s *Service) availableAotBlobCommitments(ctx context.Context) []*enginev1.VersionedHashList {
+	if s.cfg.AotDataColumnCache == nil {
+		return nil
+	}
+	cgc, err := s.cfg.P2P.CustodyGroupCount(ctx)
+	if err != nil {
+		log.WithError(err).Error("Could not get custody group count for AOT blob commitments")
+		return nil
+	}
+	commitments, err := s.cfg.AotDataColumnCache.AvailableAotBlobCommitments(s.cfg.P2P.NodeID(), cgc)
+	if err != nil {
+		log.WithError(err).Error("Could not get available AOT blob commitments")
+		return nil
+	}
+	return commitments
 }
 
 // latePayloadTasks sends an FCU when no payload arrived for the current slot's block.

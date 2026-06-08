@@ -180,6 +180,49 @@ func (c *AotDataColumnCache) storedIndices(key aotBundleKey) map[uint64]bool {
 	return out
 }
 
+// hasAllColumns reports whether every required custody column index has been stashed
+// for this bundle. A bundle is "custody fulfilled" once this returns true.
+func (b *aotBundle) hasAllColumns(requiredCustody map[uint64]bool) bool {
+	for index, required := range requiredCustody {
+		if !required {
+			continue
+		}
+		if _, ok := b.columns[index]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// AvailableAotBlobVersionedHashes returns, for each staged AOT bundle whose stashed
+// columns cover all of requiredCustody, the versioned hashes of that bundle's blob KZG
+// commitments. It is a list-of-lists: one inner list per custody-fulfilled bundle, each
+// holding that bundle's blob versioned hashes (one per KZG commitment).
+//
+// requiredCustody is the set of column indices this node must custody, as returned by
+// peerdas.Info(nodeID, cgc).CustodyColumns. A bundle is included only when every such
+// index has been stashed for it, i.e. the node successfully custodies the bundle's data.
+// The result feeds PayloadAttributes.availableAotBlobCommitments so the EL learns which
+// AOT blobs are available for inclusion. The outer order is unspecified (map iteration).
+func (c *AotDataColumnCache) AvailableAotBlobVersionedHashes(requiredCustody map[uint64]bool) [][][]byte {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var out [][][]byte
+	for _, bundle := range c.bundles {
+		if !bundle.hasAllColumns(requiredCustody) {
+			continue
+		}
+		hashes := make([][]byte, len(bundle.commitments))
+		for i, commitment := range bundle.commitments {
+			h := primitives.ConvertKzgCommitmentToVersionedHash(commitment)
+			hashes[i] = h[:]
+		}
+		out = append(out, hashes)
+	}
+	return out
+}
+
 // evict removes a bundle from the cache, e.g. after its columns have been merged
 // into the block-root store.
 func (c *AotDataColumnCache) evict(key aotBundleKey) {

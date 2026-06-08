@@ -135,6 +135,32 @@ func TestAotDataColumnCache_Prune(t *testing.T) {
 	require.DeepEqual(t, map[uint64]bool(nil), c.storedIndices(key))
 }
 
+func TestAotDataColumnCache_AvailableAotBlobVersionedHashes(t *testing.T) {
+	c := NewAotDataColumnCache()
+	commitsA := [][]byte{aotTestCommitment(1), aotTestCommitment(2)}
+	commitsB := [][]byte{aotTestCommitment(9)}
+
+	// Bundle A has custody columns 0 and 7 stashed; bundle B only has 0.
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commitsA)))
+	require.NoError(t, c.Stash(aotTestSidecar(7, 10, commitsA)))
+	require.NoError(t, c.Stash(aotTestSidecar(0, 10, commitsB)))
+
+	// Requiring {0, 7}: only bundle A is custody-fulfilled (B is missing index 7).
+	got := c.AvailableAotBlobVersionedHashes(map[uint64]bool{0: true, 7: true})
+	require.Equal(t, 1, len(got))
+	expectedA := [][]byte{
+		primitives.ConvertKzgCommitmentToVersionedHash(commitsA[0]).Bytes(),
+		primitives.ConvertKzgCommitmentToVersionedHash(commitsA[1]).Bytes(),
+	}
+	require.DeepEqual(t, expectedA, got[0])
+
+	// Requiring {0}: both bundles are fulfilled.
+	require.Equal(t, 2, len(c.AvailableAotBlobVersionedHashes(map[uint64]bool{0: true})))
+
+	// Requiring an index no bundle has: nothing is available.
+	require.Equal(t, 0, len(c.AvailableAotBlobVersionedHashes(map[uint64]bool{3: true})))
+}
+
 func TestAotDataColumnCache_SubscribeNotifiesOnStash(t *testing.T) {
 	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(8)}

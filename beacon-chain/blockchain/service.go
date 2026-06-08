@@ -16,6 +16,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/helpers"
 	coreTime "github.com/OffchainLabs/prysm/v7/beacon-chain/core/time"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/core/transition"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/das"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db/filesystem"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/execution"
@@ -97,6 +98,7 @@ type config struct {
 	FinalizedStateAtStartUp  state.BeaconState
 	ExecutionEngineCaller    execution.EngineCaller
 	SyncChecker              Checker
+	AotDataColumnCache       *das.AotDataColumnCache
 }
 
 // Checker is an interface used to determine if a node is in initial sync
