@@ -62,14 +62,25 @@ message ExecutionPayloadBid {
     (ethereum.eth.ext.ssz_max) = "max_blob_commitments.size"
   ];
   bytes execution_requests_root = 12 [ (ethereum.eth.ext.ssz_size) = "32" ];
-  // aot_blob_kzg_commitments_roots holds one Root per AOT ticket referenced by the block. Each Root =
-  // hash_tree_root(ticket.kzg_commitments), i.e. the HTR of an AOTDataColumnSidecar's kzg_commitments
-  // list, which is the cache key the DA check uses to address staged AOT columns.
-  // [New in Heze:EIP-blob-streaming] Added alongside (not replacing) blob_kzg_commitments, which
-  // continues to serve as the JIT commitment list. Spec name: aot_blob_kzg_commitments_roots.
-  repeated bytes aot_blob_kzg_commitments_roots = 13 [
-    (ethereum.eth.ext.ssz_size) = "?,32",
-    (ethereum.eth.ext.ssz_max) = "max_aot_blob_commitments.size"
+  // aot_blob_kzg_commitments holds one KZG commitment list per AOT ticket referenced by the block:
+  // a list-of-lists where the inner list is that ticket's full blob KZG commitment list.
+  // [Modified in Heze:EIP-blob-streaming] Replaces the earlier per-ticket HTR roots
+  // (aot_blob_kzg_commitments_roots) with the full commitment lists. Sits alongside
+  // blob_kzg_commitments (field 11), which remains the JIT list. Spec:
+  // aot_blob_kzg_commitments: List[List[KZGCommitment, MAX_JIT_BLOB_COMMITMENTS_PER_BLOCK],
+  // MAX_AOT_BLOB_COMMITMENTS_PER_BLOCK].
+  repeated KzgCommitmentList aot_blob_kzg_commitments = 13
+      [ (ethereum.eth.ext.ssz_max) = "max_aot_blob_commitments.size" ];
+}
+
+// KzgCommitmentList wraps one AOT ticket's blob KZG commitment list so that
+// ExecutionPayloadBid.aot_blob_kzg_commitments can express a list-of-lists (proto3 has no
+// repeated-of-repeated). The inner list is bounded by the JIT blob-commitment limit, matching the
+// spec inner type List[KZGCommitment, MAX_JIT_BLOB_COMMITMENTS_PER_BLOCK].
+message KzgCommitmentList {
+  repeated bytes kzg_commitments = 1 [
+    (ethereum.eth.ext.ssz_size) = "?,48",
+    (ethereum.eth.ext.ssz_max) = "max_blob_commitments.size"
   ];
 }
 

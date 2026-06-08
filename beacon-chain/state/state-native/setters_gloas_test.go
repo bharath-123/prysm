@@ -49,10 +49,10 @@ func (t testExecutionPayloadBid) BlobKzgCommitments() [][]byte { return t.blobKz
 func (t testExecutionPayloadBid) BlobKzgCommitmentCount() uint64 {
 	return uint64(len(t.blobKzgCommitments))
 }
-func (t testExecutionPayloadBid) AotBlobKzgCommitmentsRoots() [][]byte { return nil }
-func (t testExecutionPayloadBid) FeeRecipient() [20]byte               { return t.feeRecipient }
-func (t testExecutionPayloadBid) ExecutionRequestsRoot() [32]byte      { return [32]byte{} }
-func (t testExecutionPayloadBid) IsNil() bool                          { return false }
+func (t testExecutionPayloadBid) AotBlobKzgCommitments() [][][]byte { return nil }
+func (t testExecutionPayloadBid) FeeRecipient() [20]byte            { return t.feeRecipient }
+func (t testExecutionPayloadBid) ExecutionRequestsRoot() [32]byte   { return [32]byte{} }
+func (t testExecutionPayloadBid) IsNil() bool                       { return false }
 
 func TestSetExecutionPayloadBid(t *testing.T) {
 	t.Run("previous fork returns expected error", func(t *testing.T) {

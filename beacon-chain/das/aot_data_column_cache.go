@@ -22,8 +22,9 @@ var (
 const aotBundleRetentionSlots = primitives.Slot(2)
 
 // aotBundleKey is the hash tree root of an AOT bundle's KZG commitment list. It is
-// equal to the corresponding entry in bid.aot_blob_kzg_commitments_roots, so a
-// block's bid addresses staged AOT columns directly at data-availability time.
+// equal to the HTR of the corresponding entry in bid.aot_blob_kzg_commitments (the
+// per-ticket commitment list), so a block's bid addresses staged AOT columns at
+// data-availability time by hashing each of its AOT commitment lists.
 type aotBundleKey = [32]byte
 
 // AotDataColumnsIdent identifies the AOT data columns staged for a single bundle. It
@@ -31,7 +32,7 @@ type aotBundleKey = [32]byte
 // the DA check) can wait until the indices they need have been seen.
 type AotDataColumnsIdent struct {
 	// CommitmentsRoot is the hash tree root of the bundle's KZG commitment list (the
-	// cache key, equal to the value found in bid.aot_blob_kzg_commitments_roots).
+	// cache key, equal to the HTR of an entry in bid.aot_blob_kzg_commitments).
 	CommitmentsRoot [32]byte
 	// Indices are all AOT column indices seen so far for this bundle.
 	Indices []uint64
@@ -45,8 +46,8 @@ type AotDataColumnsIdent struct {
 // are implemented separately.)
 //
 // ticket_id is deliberately NOT used as a key: it is only a gossip-propagation
-// construct and is not observable on-chain. The bid references AOT bundles solely by
-// their commitment-list roots.
+// construct and is not observable on-chain. The bid references AOT bundles by their
+// commitment lists (bid.aot_blob_kzg_commitments); the key is the HTR of each list.
 //
 // TODO - The AotDataColumnCache must be persisted in disk to survive node restarts since
 // the DA check for AOT data columns is important for attesters. 
@@ -75,10 +76,11 @@ func NewAotDataColumnCache() *AotDataColumnCache {
 // KZG commitment list.
 //
 // NOTE: ssz.KzgCommitmentsRoot merkleizes with limit MAX_BLOB_COMMITMENTS_PER_BLOCK.
-// The spec key uses MAX_AOT_BLOB_COMMITMENTS_PER_BLOCK; these are equal under the
-// current placeholder (4096), so the key matches bid.aot_blob_kzg_commitments_roots.
-// If MAX_AOT ever diverges from MAX_BLOB_COMMITMENTS_PER_BLOCK, replace this with a
-// merkleization using the AOT limit.
+// The bid's inner AOT commitment lists are merkleized with the JIT limit
+// (MAX_JIT_BLOB_COMMITMENTS_PER_BLOCK); these are equal under the current placeholder
+// (4096), so the key matches htr(bid.aot_blob_kzg_commitments[i]). If the AOT inner
+// limit ever diverges from MAX_BLOB_COMMITMENTS_PER_BLOCK, replace this with a
+// merkleization using the matching limit.
 func aotBundleKeyFor(sidecar *ethpb.AOTDataColumnSidecar) (aotBundleKey, error) {
 	return ssz.KzgCommitmentsRoot(sidecar.GetKzgCommitments())
 }

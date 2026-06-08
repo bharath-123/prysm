@@ -14,6 +14,7 @@ import (
 type GetPayloadResponse struct {
 	ExecutionData   interfaces.ExecutionData
 	BlobsBundler    pb.BlobsBundler
+	AotBlobsBundler pb.AotBlobsBundler
 	OverrideBuilder bool
 	// todo: should we convert this to Gwei up front?
 	Bid               primitives.Wei
@@ -51,6 +52,10 @@ func NewGetPayloadResponse(msg proto.Message) (*GetPayloadResponse, error) {
 	bundleV2Getter, hasBundle := msg.(bundleV2Getter)
 	if hasBundle {
 		r.BlobsBundler = bundleV2Getter.GetBlobsBundle()
+	}
+	aotBundler, hasAotBundle := msg.(pb.AotBlobsBundler)
+	if hasAotBundle {
+		r.AotBlobsBundler = aotBundler
 	}
 	bidValueGetter, hasBid := msg.(bidValueGetter)
 	wei := primitives.ZeroWei()

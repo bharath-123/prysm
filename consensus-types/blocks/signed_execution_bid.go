@@ -147,10 +147,15 @@ func (h executionPayloadBidGloas) BlobKzgCommitmentCount() uint64 {
 	return uint64(len(h.payload.BlobKzgCommitments))
 }
 
-// AotBlobKzgCommitmentsRoots returns the per-ticket AOT blob KZG commitment-list roots referenced by
-// the block. Each root is the hash tree root of an AOT ticket's kzg_commitments list. [Blob streaming]
-func (h executionPayloadBidGloas) AotBlobKzgCommitmentsRoots() [][]byte {
-	return bytesutil.SafeCopy2dBytes(h.payload.AotBlobKzgCommitmentsRoots)
+// AotBlobKzgCommitments returns the per-ticket AOT blob KZG commitment lists referenced by the block.
+// The outer slice is one entry per AOT ticket; each inner slice is that ticket's full blob KZG
+// commitment list. [Blob streaming]
+func (h executionPayloadBidGloas) AotBlobKzgCommitments() [][][]byte {
+	out := make([][][]byte, len(h.payload.AotBlobKzgCommitments))
+	for i, list := range h.payload.AotBlobKzgCommitments {
+		out[i] = bytesutil.SafeCopy2dBytes(list.GetKzgCommitments())
+	}
+	return out
 }
 
 // FeeRecipient returns the execution address that will receive the builder payment.
