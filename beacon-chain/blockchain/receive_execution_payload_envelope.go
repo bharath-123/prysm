@@ -190,15 +190,31 @@ func (s *Service) getPayloadEnvelopePrestate(ctx context.Context, envelope inter
 	return preState, nil
 }
 
+// aotVersionedHashesFromCommitmentLists converts the bid's per-ticket AOT KZG commitment
+// lists into per-ticket blob versioned-hash lists for engine_newPayload (Blob Streaming).
+// The shape (list-of-lists) is preserved so the EL sees the per-ticket grouping.
+func aotVersionedHashesFromCommitmentLists(commitmentLists [][][]byte) [][]common.Hash {
+	out := make([][]common.Hash, len(commitmentLists))
+	for i, list := range commitmentLists {
+		hashes := make([]common.Hash, len(list))
+		for j, c := range list {
+			hashes[j] = primitives.ConvertKzgCommitmentToVersionedHash(c)
+		}
+		out[i] = hashes
+	}
+	return out
+}
+
 func (s *Service) callNewPayload(
 	ctx context.Context,
 	payload interfaces.ExecutionData,
 	versionedHashes []common.Hash,
+	aotVersionedHashes [][]common.Hash,
 	parentRoot common.Hash,
 	requests *enginev1.ExecutionRequests,
 	slot primitives.Slot,
 ) (bool, error) {
-	_, err := s.cfg.ExecutionEngineCaller.NewPayload(ctx, payload, versionedHashes, &parentRoot, requests)
+	_, err := s.cfg.ExecutionEngineCaller.NewPayload(ctx, payload, versionedHashes, aotVersionedHashes, &parentRoot, requests)
 	if err == nil {
 		return true, nil
 	}
@@ -227,11 +243,16 @@ func (s *Service) notifyNewEnvelopeFromBlock(ctx context.Context, b blocks.ROBlo
 	if err != nil {
 		return false, errors.Wrap(err, "could not get signed execution payload bid from block")
 	}
-	versionedHashes := make([]common.Hash, len(sbid.Message.BlobKzgCommitments))
-	for i, c := range sbid.Message.BlobKzgCommitments {
+	versionedHashes := make([]common.Hash, len(sbid.Message.GetBlobKzgCommitments()))
+	for i, c := range sbid.Message.GetBlobKzgCommitments() {
 		versionedHashes[i] = primitives.ConvertKzgCommitmentToVersionedHash(c)
 	}
-	return s.callNewPayload(ctx, payload, versionedHashes, common.Hash(envelope.ParentBeaconBlockRoot()), envelope.ExecutionRequests(), envelope.Slot())
+	aotCommitments := make([][][]byte, len(sbid.Message.GetAotBlobKzgCommitments()))
+	for i, list := range sbid.Message.GetAotBlobKzgCommitments() {
+		aotCommitments[i] = list.KzgCommitments
+	}
+	aotVersionedHashes := aotVersionedHashesFromCommitmentLists(aotCommitments)
+	return s.callNewPayload(ctx, payload, versionedHashes, aotVersionedHashes, common.Hash(envelope.ParentBeaconBlockRoot()), envelope.ExecutionRequests(), envelope.Slot())
 }
 
 // The returned boolean indicates whether the payload was valid or if it was accepted as syncing (optimistic).
@@ -252,7 +273,8 @@ func (s *Service) notifyNewEnvelope(ctx context.Context, st state.BeaconState, e
 	for i, c := range commitments {
 		versionedHashes[i] = primitives.ConvertKzgCommitmentToVersionedHash(c)
 	}
-	return s.callNewPayload(ctx, payload, versionedHashes, common.Hash(envelope.ParentBeaconBlockRoot()), envelope.ExecutionRequests(), envelope.Slot())
+	aotVersionedHashes := aotVersionedHashesFromCommitmentLists(latestBid.AotBlobKzgCommitments())
+	return s.callNewPayload(ctx, payload, versionedHashes, aotVersionedHashes, common.Hash(envelope.ParentBeaconBlockRoot()), envelope.ExecutionRequests(), envelope.Slot())
 }
 
 func (s *Service) validateExecutionOnEnvelope(ctx context.Context, st state.BeaconState, envelope interfaces.ROExecutionPayloadEnvelope) (bool, error) {

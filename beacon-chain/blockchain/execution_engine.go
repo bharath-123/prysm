@@ -271,7 +271,9 @@ func (s *Service) notifyNewPayload(ctx context.Context, stVersion int, header in
 		}
 	}
 
-	lastValidHash, err = s.cfg.ExecutionEngineCaller.NewPayload(ctx, payload, versionedHashes, parentRoot, requests)
+	// AOT blob versioned hashes are sourced from the bid on the envelope import path
+	// (notifyNewEnvelope*); this block-body path carries only JIT hashes.
+	lastValidHash, err = s.cfg.ExecutionEngineCaller.NewPayload(ctx, payload, versionedHashes, nil, parentRoot, requests)
 	if err == nil {
 		newPayloadValidNodeCount.Inc()
 		return true, nil
