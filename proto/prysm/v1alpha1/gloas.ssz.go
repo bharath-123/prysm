@@ -78,9 +78,12 @@ func (e *ExecutionPayloadBid) MarshalSSZTo(buf []byte) (dst []byte, err error) {
 	}
 	dst = append(dst, e.ExecutionRequestsRoot...)
 
-	// Offset (12) 'AotBlobKzgCommitmentsRoots'
+	// Offset (12) 'AotBlobKzgCommitments'
 	dst = ssz.WriteOffset(dst, offset)
-	offset += len(e.AotBlobKzgCommitmentsRoots) * 32
+	for ii := 0; ii < len(e.AotBlobKzgCommitments); ii++ {
+		offset += 4
+		offset += e.AotBlobKzgCommitments[ii].SizeSSZ()
+	}
 
 	// Field (10) 'BlobKzgCommitments'
 	if size := len(e.BlobKzgCommitments); size > 4096 {
@@ -95,17 +98,22 @@ func (e *ExecutionPayloadBid) MarshalSSZTo(buf []byte) (dst []byte, err error) {
 		dst = append(dst, e.BlobKzgCommitments[ii]...)
 	}
 
-	// Field (12) 'AotBlobKzgCommitmentsRoots'
-	if size := len(e.AotBlobKzgCommitmentsRoots); size > 4096 {
-		err = ssz.ErrListTooBigFn("--.AotBlobKzgCommitmentsRoots", size, 4096)
+	// Field (12) 'AotBlobKzgCommitments'
+	if size := len(e.AotBlobKzgCommitments); size > 4096 {
+		err = ssz.ErrListTooBigFn("--.AotBlobKzgCommitments", size, 4096)
 		return
 	}
-	for ii := 0; ii < len(e.AotBlobKzgCommitmentsRoots); ii++ {
-		if size := len(e.AotBlobKzgCommitmentsRoots[ii]); size != 32 {
-			err = ssz.ErrBytesLengthFn("--.AotBlobKzgCommitmentsRoots[ii]", size, 32)
+	{
+		offset = 4 * len(e.AotBlobKzgCommitments)
+		for ii := 0; ii < len(e.AotBlobKzgCommitments); ii++ {
+			dst = ssz.WriteOffset(dst, offset)
+			offset += e.AotBlobKzgCommitments[ii].SizeSSZ()
+		}
+	}
+	for ii := 0; ii < len(e.AotBlobKzgCommitments); ii++ {
+		if dst, err = e.AotBlobKzgCommitments[ii].MarshalSSZTo(dst); err != nil {
 			return
 		}
-		dst = append(dst, e.AotBlobKzgCommitmentsRoots[ii]...)
 	}
 
 	return
@@ -182,7 +190,7 @@ func (e *ExecutionPayloadBid) UnmarshalSSZ(buf []byte) error {
 	}
 	e.ExecutionRequestsRoot = append(e.ExecutionRequestsRoot, buf[192:224]...)
 
-	// Offset (12) 'AotBlobKzgCommitmentsRoots'
+	// Offset (12) 'AotBlobKzgCommitments'
 	if o12 = ssz.ReadOffset(buf[224:228]); o12 > size || o10 > o12 {
 		return ssz.ErrOffset
 	}
@@ -203,19 +211,25 @@ func (e *ExecutionPayloadBid) UnmarshalSSZ(buf []byte) error {
 		}
 	}
 
-	// Field (12) 'AotBlobKzgCommitmentsRoots'
+	// Field (12) 'AotBlobKzgCommitments'
 	{
 		buf = tail[o12:]
-		num, err := ssz.DivideInt2(len(buf), 32, 4096)
+		num, err := ssz.DecodeDynamicLength(buf, 4096)
 		if err != nil {
 			return err
 		}
-		e.AotBlobKzgCommitmentsRoots = make([][]byte, num)
-		for ii := 0; ii < num; ii++ {
-			if cap(e.AotBlobKzgCommitmentsRoots[ii]) == 0 {
-				e.AotBlobKzgCommitmentsRoots[ii] = make([]byte, 0, len(buf[ii*32:(ii+1)*32]))
+		e.AotBlobKzgCommitments = make([]*KzgCommitmentList, num)
+		err = ssz.UnmarshalDynamic(buf, num, func(indx int, buf []byte) (err error) {
+			if e.AotBlobKzgCommitments[indx] == nil {
+				e.AotBlobKzgCommitments[indx] = new(KzgCommitmentList)
 			}
-			e.AotBlobKzgCommitmentsRoots[ii] = append(e.AotBlobKzgCommitmentsRoots[ii], buf[ii*32:(ii+1)*32]...)
+			if err = e.AotBlobKzgCommitments[indx].UnmarshalSSZ(buf); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 	return err
@@ -228,8 +242,11 @@ func (e *ExecutionPayloadBid) SizeSSZ() (size int) {
 	// Field (10) 'BlobKzgCommitments'
 	size += len(e.BlobKzgCommitments) * 48
 
-	// Field (12) 'AotBlobKzgCommitmentsRoots'
-	size += len(e.AotBlobKzgCommitmentsRoots) * 32
+	// Field (12) 'AotBlobKzgCommitments'
+	for ii := 0; ii < len(e.AotBlobKzgCommitments); ii++ {
+		size += 4
+		size += e.AotBlobKzgCommitments[ii].SizeSSZ()
+	}
 
 	return
 }
@@ -319,22 +336,129 @@ func (e *ExecutionPayloadBid) HashTreeRootWith(hh *ssz.Hasher) (err error) {
 	}
 	hh.PutBytes(e.ExecutionRequestsRoot)
 
-	// Field (12) 'AotBlobKzgCommitmentsRoots'
+	// Field (12) 'AotBlobKzgCommitments'
 	{
-		if size := len(e.AotBlobKzgCommitmentsRoots); size > 4096 {
-			err = ssz.ErrListTooBigFn("--.AotBlobKzgCommitmentsRoots", size, 4096)
+		subIndx := hh.Index()
+		num := uint64(len(e.AotBlobKzgCommitments))
+		if num > 4096 {
+			err = ssz.ErrIncorrectListSize
+			return
+		}
+		for _, elem := range e.AotBlobKzgCommitments {
+			if err = elem.HashTreeRootWith(hh); err != nil {
+				return
+			}
+		}
+		hh.MerkleizeWithMixin(subIndx, num, 4096)
+	}
+
+	hh.Merkleize(indx)
+	return
+}
+
+// MarshalSSZ ssz marshals the KzgCommitmentList object
+func (k *KzgCommitmentList) MarshalSSZ() ([]byte, error) {
+	return ssz.MarshalSSZ(k)
+}
+
+// MarshalSSZTo ssz marshals the KzgCommitmentList object to a target array
+func (k *KzgCommitmentList) MarshalSSZTo(buf []byte) (dst []byte, err error) {
+	dst = buf
+	offset := int(4)
+
+	// Offset (0) 'KzgCommitments'
+	dst = ssz.WriteOffset(dst, offset)
+	offset += len(k.KzgCommitments) * 48
+
+	// Field (0) 'KzgCommitments'
+	if size := len(k.KzgCommitments); size > 4096 {
+		err = ssz.ErrListTooBigFn("--.KzgCommitments", size, 4096)
+		return
+	}
+	for ii := 0; ii < len(k.KzgCommitments); ii++ {
+		if size := len(k.KzgCommitments[ii]); size != 48 {
+			err = ssz.ErrBytesLengthFn("--.KzgCommitments[ii]", size, 48)
+			return
+		}
+		dst = append(dst, k.KzgCommitments[ii]...)
+	}
+
+	return
+}
+
+// UnmarshalSSZ ssz unmarshals the KzgCommitmentList object
+func (k *KzgCommitmentList) UnmarshalSSZ(buf []byte) error {
+	var err error
+	size := uint64(len(buf))
+	if size < 4 {
+		return ssz.ErrSize
+	}
+
+	tail := buf
+	var o0 uint64
+
+	// Offset (0) 'KzgCommitments'
+	if o0 = ssz.ReadOffset(buf[0:4]); o0 > size {
+		return ssz.ErrOffset
+	}
+
+	if o0 != 4 {
+		return ssz.ErrInvalidVariableOffset
+	}
+
+	// Field (0) 'KzgCommitments'
+	{
+		buf = tail[o0:]
+		num, err := ssz.DivideInt2(len(buf), 48, 4096)
+		if err != nil {
+			return err
+		}
+		k.KzgCommitments = make([][]byte, num)
+		for ii := 0; ii < num; ii++ {
+			if cap(k.KzgCommitments[ii]) == 0 {
+				k.KzgCommitments[ii] = make([]byte, 0, len(buf[ii*48:(ii+1)*48]))
+			}
+			k.KzgCommitments[ii] = append(k.KzgCommitments[ii], buf[ii*48:(ii+1)*48]...)
+		}
+	}
+	return err
+}
+
+// SizeSSZ returns the ssz encoded size in bytes for the KzgCommitmentList object
+func (k *KzgCommitmentList) SizeSSZ() (size int) {
+	size = 4
+
+	// Field (0) 'KzgCommitments'
+	size += len(k.KzgCommitments) * 48
+
+	return
+}
+
+// HashTreeRoot ssz hashes the KzgCommitmentList object
+func (k *KzgCommitmentList) HashTreeRoot() ([32]byte, error) {
+	return ssz.HashWithDefaultHasher(k)
+}
+
+// HashTreeRootWith ssz hashes the KzgCommitmentList object with a hasher
+func (k *KzgCommitmentList) HashTreeRootWith(hh *ssz.Hasher) (err error) {
+	indx := hh.Index()
+
+	// Field (0) 'KzgCommitments'
+	{
+		if size := len(k.KzgCommitments); size > 4096 {
+			err = ssz.ErrListTooBigFn("--.KzgCommitments", size, 4096)
 			return
 		}
 		subIndx := hh.Index()
-		for _, i := range e.AotBlobKzgCommitmentsRoots {
-			if len(i) != 32 {
+		for _, i := range k.KzgCommitments {
+			if len(i) != 48 {
 				err = ssz.ErrBytesLength
 				return
 			}
-			hh.Append(i)
+			hh.PutBytes(i)
 		}
 
-		numItems := uint64(len(e.AotBlobKzgCommitmentsRoots))
+		numItems := uint64(len(k.KzgCommitments))
 		hh.MerkleizeWithMixin(subIndx, numItems, 4096)
 	}
 
