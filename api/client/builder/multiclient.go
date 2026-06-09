@@ -45,7 +45,7 @@ type MultiBuilderClient interface {
 	// URL passed in and returns the bids that were served successfully, keyed by
 	// the builder URL that served each bid (used for provenance so the signed
 	// beacon block can later be submitted back to the selected builder). For each
-	// builder the matching SignedRequestAuthV1 (by builder_url) is attached as the
+	// builder the matching SignedRequestAuthV1 (by its data/URL) is attached as the
 	// optional request body. The builder URLs and auths originate from the
 	// validator client (forwarded in the BlockRequest), not from beacon-node
 	// configuration.
@@ -58,7 +58,7 @@ type MultiBuilderClient interface {
 	// BuilderPreferencesRequestV1 to each builder named in prefsByURL.
 	// validatorPubkey is the proposer whose preferences these are (the path
 	// parameter); each request body carries its own SignedRequestAuthV1 whose
-	// message builder_url must match the target builder.
+	// message data (the builder URL) must match the target builder.
 	SubmitBuilderPreferences(ctx context.Context, validatorPubkey [48]byte, prefsByURL map[string]*ethpb.BuilderPreferencesRequestV1) error
 }
 
@@ -167,7 +167,7 @@ func (c *MultiClient) do(ctx context.Context, base *url.URL, method string, path
 // GetExecutionPayloadBid requests an execution payload bid from each builder URL
 // passed in for the given (slot, parentHash, parentRoot, proposer pubkey) tuple
 // and returns the bids that were served successfully. For each builder, the
-// SignedRequestAuthV1 whose message builder_url matches that URL is attached as
+// SignedRequestAuthV1 whose message data matches that URL is attached as
 // the optional request body. Builders that return no bid (204) or error are
 // skipped; bid selection is performed by the caller.
 func (c *MultiClient) GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubkey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
@@ -181,7 +181,7 @@ func (c *MultiClient) GetExecutionPayloadBid(ctx context.Context, urls []string,
 	authByURL := make(map[string]*ethpb.SignedRequestAuthV1, len(auths))
 	for _, a := range auths {
 		if a != nil && a.Message != nil {
-			authByURL[string(a.Message.BuilderUrl)] = a
+			authByURL[string(a.Message.Data)] = a
 		}
 	}
 
@@ -328,27 +328,27 @@ func parseExecutionPayloadBidResponse(data []byte) (*ethpb.SignedExecutionPayloa
 }
 
 // signedRequestAuthJSON is the JSON wire form of a SignedRequestAuthV1 used as
-// the optional getExecutionPayloadBid auth body. builder_url is a plain URL
-// string (not base64/hex), slot is a decimal string, and signature is 0x-hex —
-// matching the Builder API spec (examples/gloas/signed_request_auth.json). The
-// generated proto JSON cannot be used directly: builder_url is a `bytes` field,
-// so encoding/json would emit it base64-encoded.
+// the optional getExecutionPayloadBid auth body. data is a plain URL string
+// (not base64/hex) set to the builder's URL, slot is a decimal string, and
+// signature is 0x-hex — matching the Builder API spec. The generated proto JSON
+// cannot be used directly: data is a `bytes` field, so encoding/json would emit
+// it base64-encoded.
 type signedRequestAuthJSON struct {
 	Message   requestAuthJSON `json:"message"`
 	Signature string          `json:"signature"`
 }
 
 type requestAuthJSON struct {
-	BuilderURL string `json:"builder_url"`
-	Slot       string `json:"slot"`
+	Data string `json:"data"`
+	Slot string `json:"slot"`
 }
 
 // marshalRequestAuth encodes a SignedRequestAuthV1 to its Builder API JSON form.
 func marshalRequestAuth(a *ethpb.SignedRequestAuthV1) ([]byte, error) {
 	return json.Marshal(signedRequestAuthJSON{
 		Message: requestAuthJSON{
-			BuilderURL: string(a.Message.BuilderUrl),
-			Slot:       fmt.Sprintf("%d", a.Message.Slot),
+			Data: string(a.Message.Data),
+			Slot: fmt.Sprintf("%d", a.Message.Slot),
 		},
 		Signature: hexutil.Encode(a.Signature),
 	})
@@ -367,7 +367,7 @@ type builderPreferencesJSON struct {
 
 // marshalBuilderPreferencesRequest encodes a BuilderPreferencesRequestV1 to its
 // Builder API JSON form (max_execution_payment as a decimal string; auth as in
-// marshalRequestAuth — builder_url plain string, slot decimal, signature 0x-hex).
+// marshalRequestAuth — data plain string (builder URL), slot decimal, signature 0x-hex).
 func marshalBuilderPreferencesRequest(req *ethpb.BuilderPreferencesRequestV1) ([]byte, error) {
 	if req == nil || req.Preferences == nil || req.Auth == nil || req.Auth.Message == nil {
 		return nil, errors.New("incomplete builder preferences request")
@@ -378,8 +378,8 @@ func marshalBuilderPreferencesRequest(req *ethpb.BuilderPreferencesRequestV1) ([
 		},
 		Auth: signedRequestAuthJSON{
 			Message: requestAuthJSON{
-				BuilderURL: string(req.Auth.Message.BuilderUrl),
-				Slot:       fmt.Sprintf("%d", req.Auth.Message.Slot),
+				Data: string(req.Auth.Message.Data),
+				Slot: fmt.Sprintf("%d", req.Auth.Message.Slot),
 			},
 			Signature: hexutil.Encode(req.Auth.Signature),
 		},

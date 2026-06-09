@@ -237,15 +237,16 @@ message ValidatorRegistrationV1 {
 
 // RequestAuthV1 authenticates a proposer's `getExecutionPayloadBid` request to
 // a builder (Gloas/ePBS Builder API). The proposer signs it and sends the
-// resulting SignedRequestAuthV1 in the request body. The per-builder
-// `builder_url` binding prevents one builder from replaying a request intended
-// for another.
+// resulting SignedRequestAuthV1 in the request body. The per-builder `data`
+// binding (set to the builder's URL) prevents one builder from replaying a
+// request intended for another.
 message RequestAuthV1 {
-  // URL of the builder the request is intended for. Per spec this is a
-  // ByteList[MAX_URL_SIZE] (MAX_URL_SIZE = 2048); modeled as `bytes` with an
-  // ssz_max so the container has a generated SSZ HashTreeRoot, which is required
-  // to compute the signing root over DOMAIN_REQUEST_AUTH.
-  bytes builder_url = 1 [ (ethereum.eth.ext.ssz_max) = "2048" ];
+  // Authentication data, which MUST be set to the URL of the builder the request
+  // is intended for. Per spec this is a ByteList[MAX_DATA_SIZE]
+  // (MAX_DATA_SIZE = 4096); modeled as `bytes` with an ssz_max so the container
+  // has a generated SSZ HashTreeRoot, which is required to compute the signing
+  // root over DOMAIN_REQUEST_AUTH.
+  bytes data = 1 [ (ethereum.eth.ext.ssz_max) = "4096" ];
 
   // Slot for which the bid is being requested.
   uint64 slot = 2 [

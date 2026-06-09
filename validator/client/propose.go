@@ -80,8 +80,8 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 	signedRequestAuths := make([]*ethpb.SignedRequestAuthV1, len(v.builderURLs))
 	for i, url := range v.builderURLs {
 		requestAuth := &ethpb.RequestAuthV1{
-			BuilderUrl: []byte(url),
-			Slot:       slot,
+			Data: []byte(url),
+			Slot: slot,
 		}
 		log.WithFields(logrus.Fields{
 			"builderUrl": url,
@@ -496,7 +496,7 @@ func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLS
 	}
 
 	log.WithFields(logrus.Fields{
-		"builderUrl":  string(requestAuth.BuilderUrl),
+		"builderUrl":  string(requestAuth.Data),
 		"slot":        requestAuth.Slot,
 		"pubkey":      fmt.Sprintf("%#x", bytesutil.Trunc(pubKey[:])),
 		"domain":      fmt.Sprintf("%#x", domain),
@@ -517,7 +517,7 @@ func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLS
 		Signature: sig.Marshal(),
 	}
 	log.WithFields(logrus.Fields{
-		"builderUrl": string(requestAuth.BuilderUrl),
+		"builderUrl": string(requestAuth.Data),
 		"slot":       requestAuth.Slot,
 		"signature":  fmt.Sprintf("%#x", signedAuth.Signature),
 	}).Info("BHARATH: Signed request auth")
