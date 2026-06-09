@@ -17,19 +17,19 @@ func (r *RequestAuthV1) MarshalSSZTo(buf []byte) (dst []byte, err error) {
 	dst = buf
 	offset := int(12)
 
-	// Offset (0) 'BuilderUrl'
+	// Offset (0) 'Data'
 	dst = ssz.WriteOffset(dst, offset)
-	offset += len(r.BuilderUrl)
+	offset += len(r.Data)
 
 	// Field (1) 'Slot'
 	dst = ssz.MarshalUint(dst, r.Slot)
 
-	// Field (0) 'BuilderUrl'
-	if size := len(r.BuilderUrl); size > 2048 {
-		err = ssz.ErrBytesLengthFn("--.BuilderUrl", size, 2048)
+	// Field (0) 'Data'
+	if size := len(r.Data); size > 4096 {
+		err = ssz.ErrBytesLengthFn("--.Data", size, 4096)
 		return
 	}
-	dst = append(dst, r.BuilderUrl...)
+	dst = append(dst, r.Data...)
 
 	return
 }
@@ -45,7 +45,7 @@ func (r *RequestAuthV1) UnmarshalSSZ(buf []byte) error {
 	tail := buf
 	var o0 uint64
 
-	// Offset (0) 'BuilderUrl'
+	// Offset (0) 'Data'
 	if o0 = ssz.ReadOffset(buf[0:4]); o0 > size {
 		return ssz.ErrOffset
 	}
@@ -57,16 +57,16 @@ func (r *RequestAuthV1) UnmarshalSSZ(buf []byte) error {
 	// Field (1) 'Slot'
 	r.Slot = ssz.UnmarshallUint[github_com_OffchainLabs_prysm_v7_consensus_types_primitives.Slot](buf[4:12])
 
-	// Field (0) 'BuilderUrl'
+	// Field (0) 'Data'
 	{
 		buf = tail[o0:]
-		if len(buf) > 2048 {
+		if len(buf) > 4096 {
 			return ssz.ErrBytesLength
 		}
-		if cap(r.BuilderUrl) == 0 {
-			r.BuilderUrl = make([]byte, 0, len(buf))
+		if cap(r.Data) == 0 {
+			r.Data = make([]byte, 0, len(buf))
 		}
-		r.BuilderUrl = append(r.BuilderUrl, buf...)
+		r.Data = append(r.Data, buf...)
 	}
 	return err
 }
@@ -75,8 +75,8 @@ func (r *RequestAuthV1) UnmarshalSSZ(buf []byte) error {
 func (r *RequestAuthV1) SizeSSZ() (size int) {
 	size = 12
 
-	// Field (0) 'BuilderUrl'
-	size += len(r.BuilderUrl)
+	// Field (0) 'Data'
+	size += len(r.Data)
 
 	return
 }
@@ -90,16 +90,16 @@ func (r *RequestAuthV1) HashTreeRoot() ([32]byte, error) {
 func (r *RequestAuthV1) HashTreeRootWith(hh *ssz.Hasher) (err error) {
 	indx := hh.Index()
 
-	// Field (0) 'BuilderUrl'
+	// Field (0) 'Data'
 	{
 		elemIndx := hh.Index()
-		byteLen := uint64(len(r.BuilderUrl))
-		if byteLen > 2048 {
+		byteLen := uint64(len(r.Data))
+		if byteLen > 4096 {
 			err = ssz.ErrIncorrectListSize
 			return
 		}
-		hh.AppendBytes32(r.BuilderUrl)
-		hh.MerkleizeWithMixin(elemIndx, byteLen, (2048+31)/32)
+		hh.AppendBytes32(r.Data)
+		hh.MerkleizeWithMixin(elemIndx, byteLen, (4096+31)/32)
 	}
 
 	// Field (1) 'Slot'
