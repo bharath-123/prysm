@@ -94,6 +94,7 @@ type validator struct {
 	proposerSettings             *proposer.Settings
 	web3SignerConfig             *remoteweb3signer.SetupConfig
 	builderURLs                  []string
+	builderMaxExecutionPayment   uint64
 	startBalances                map[[fieldparams.BLSPubkeyLength]byte]uint64
 	prevEpochBalances            map[[fieldparams.BLSPubkeyLength]byte]uint64
 	blacklistedPubkeys           map[[fieldparams.BLSPubkeyLength]byte]bool

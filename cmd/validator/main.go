@@ -87,6 +87,7 @@ var appFlags = []cli.Flag{
 	flags.EnableBuilderFlag,
 	flags.BuilderGasLimitFlag,
 	flags.BuilderURLs,
+	flags.BuilderMaxExecutionPayment,
 	flags.ValidatorsRegistrationBatchSizeFlag,
 	flags.EnableStatelessFlag,
 	////////////////////

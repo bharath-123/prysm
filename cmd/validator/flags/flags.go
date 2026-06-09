@@ -4,6 +4,7 @@ package flags
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -391,6 +392,13 @@ var (
 		Name:  "builder-urls",
 		Usage: "Comma-separated list of Gloas (post-ePBS) builder HTTP endpoints the validator connects to directly when proposing, e.g. https://builder-a:18550,https://builder-b:18550",
 		Value: "",
+	}
+	// BuilderMaxExecutionPayment is the max_execution_payment (Gwei) the proposer
+	// advertises to every builder via submitBuilderPreferences (Gloas Builder API).
+	BuilderMaxExecutionPayment = &cli.Uint64Flag{
+		Name:  "builder-max-execution-payment",
+		Usage: "Maximum execution-layer payment (Gwei) the proposer will accept from any builder, sent to each builder via submitBuilderPreferences. Defaults to MAX_EXECUTION_PAYMENT (2**64-1, accept any).",
+		Value: math.MaxUint64,
 	}
 	// ValidatorsRegistrationBatchSizeFlag sets the maximum size for one batch of validator registrations. Use a non-positive value to disable batching.
 	ValidatorsRegistrationBatchSizeFlag = &cli.IntFlag{

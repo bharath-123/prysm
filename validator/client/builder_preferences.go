@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"github.com/OffchainLabs/prysm/v7/config/params"
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
@@ -90,7 +89,7 @@ func (v *validator) buildBuilderPreferences(
 				"builderUrl":          url,
 				"proposalSlot":        proposalSlot,
 				"validatorIndex":      duty.ValidatorIndex,
-				"maxExecutionPayment": uint64(math.MaxUint64),
+				"maxExecutionPayment": v.builderMaxExecutionPayment,
 			}).Info("BHARATH: Creating and signing builder preferences for builder")
 			auth, err := v.signRequestAuth(ctx, pk, &ethpb.RequestAuthV1{
 				Data: []byte(url),
@@ -103,10 +102,10 @@ func (v *validator) buildBuilderPreferences(
 			}
 			prefs = append(prefs, &ethpb.BuilderPreferencesRequestV1{
 				Preferences: &ethpb.BuilderPreferencesV1{
-					// TODO(gloas): make max_execution_payment configurable per
-					// builder. For the prototype we accept any execution payment
-					// (MAX_EXECUTION_PAYMENT = 2**64 - 1, per the Gloas builder spec).
-					MaxExecutionPayment: math.MaxUint64,
+					// Set from --builder-max-execution-payment (defaults to
+					// MAX_EXECUTION_PAYMENT = 2**64-1, accept-any). A single global
+					// value is applied to every builder. TODO(gloas): per-builder.
+					MaxExecutionPayment: v.builderMaxExecutionPayment,
 				},
 				Auth: auth,
 			})
