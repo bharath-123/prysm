@@ -2,6 +2,7 @@ package validator
 
 import (
 	"context"
+	"fmt"
 
 	fieldparams "github.com/OffchainLabs/prysm/v7/config/fieldparams"
 	"github.com/OffchainLabs/prysm/v7/encoding/bytesutil"
@@ -51,6 +52,10 @@ func (vs *Server) SubmitBuilderPreferences(
 	}
 
 	validatorPubkey := bytesutil.ToBytes48(req.ValidatorPubkey)
+	log.WithFields(logrus.Fields{
+		"validatorPubkey": fmt.Sprintf("%#x", req.ValidatorPubkey),
+		"builders":        len(prefsByURL),
+	}).Info("BHARATH: Forwarding builder preferences to builders")
 	if err := vs.BlockBuilder.SubmitBuilderPreferences(ctx, validatorPubkey, prefsByURL); err != nil {
 		return nil, status.Errorf(codes.Internal, "could not submit builder preferences: %v", err)
 	}

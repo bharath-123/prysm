@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"github.com/OffchainLabs/prysm/v7/config/params"
@@ -85,6 +86,12 @@ func (v *validator) buildBuilderPreferences(
 		prefs := make([]*ethpb.BuilderPreferencesRequestV1, 0, len(v.builderURLs))
 		signOK := true
 		for _, url := range v.builderURLs {
+			log.WithFields(logrus.Fields{
+				"builderUrl":          url,
+				"proposalSlot":        proposalSlot,
+				"validatorIndex":      duty.ValidatorIndex,
+				"maxExecutionPayment": uint64(math.MaxUint64),
+			}).Info("BHARATH: Creating and signing builder preferences for builder")
 			auth, err := v.signRequestAuth(ctx, pk, &ethpb.RequestAuthV1{
 				Data: []byte(url),
 				Slot: proposalSlot,
@@ -114,6 +121,11 @@ func (v *validator) buildBuilderPreferences(
 			Preferences:     prefs,
 		})
 		v.submittedBuilderPrefSlots[proposalSlot] = true
+		log.WithFields(logrus.Fields{
+			"proposalSlot":   proposalSlot,
+			"validatorIndex": duty.ValidatorIndex,
+			"builders":       len(prefs),
+		}).Info("BHARATH: Built builder preferences for proposing validator")
 	}
 
 	if sigFailCount > 0 {
@@ -134,7 +146,12 @@ func (v *validator) buildBuilderPreferences(
 // Submission is delayed to mid-slot so the block for this slot is processed
 // first, mirroring the proposer-preferences submission.
 func (v *validator) submitBuilderPreferences(ctx context.Context, reqs []*ethpb.SubmitBuilderPreferencesRequest) {
+	log.WithField("validators", len(reqs)).Info("BHARATH: Sending builder preferences to beacon node")
 	for _, req := range reqs {
+		log.WithFields(logrus.Fields{
+			"validatorPubkey": fmt.Sprintf("%#x", req.ValidatorPubkey),
+			"builders":        len(req.Preferences),
+		}).Info("BHARATH: Submitting builder preferences for validator")
 		if _, err := v.validatorClient.SubmitBuilderPreferences(ctx, req); err != nil {
 			log.WithError(err).Warn("Failed to submit builder preferences")
 		}

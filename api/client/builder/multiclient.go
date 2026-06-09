@@ -267,6 +267,7 @@ func (c *MultiClient) SubmitBuilderPreferences(ctx context.Context, validatorPub
 			failures = append(failures, fmt.Sprintf("%s: %v", host, err))
 			continue
 		}
+		log.WithField("builder", host).WithField("prefsBody", string(body)).Info("BHARATH: POSTing builder preferences to builder")
 		if _, _, err := c.do(ctx, base, http.MethodPost, path, bytes.NewReader(body), http.StatusAccepted, jsonContentType); err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", host, err))
 			continue
