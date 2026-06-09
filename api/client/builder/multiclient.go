@@ -328,11 +328,11 @@ func parseExecutionPayloadBidResponse(data []byte) (*ethpb.SignedExecutionPayloa
 }
 
 // signedRequestAuthJSON is the JSON wire form of a SignedRequestAuthV1 used as
-// the optional getExecutionPayloadBid auth body. data is a plain URL string
-// (not base64/hex) set to the builder's URL, slot is a decimal string, and
-// signature is 0x-hex — matching the Builder API spec. The generated proto JSON
-// cannot be used directly: data is a `bytes` field, so encoding/json would emit
-// it base64-encoded.
+// the optional getExecutionPayloadBid auth body. data is the builder's URL bytes
+// encoded as a 0x-hex string (the standard JSON encoding for an SSZ ByteList, the
+// same convention Prysm uses for extra_data/transactions), slot is a decimal
+// string, and signature is 0x-hex. The generated proto JSON cannot be used
+// directly: data is a `bytes` field, so encoding/json would emit it base64.
 type signedRequestAuthJSON struct {
 	Message   requestAuthJSON `json:"message"`
 	Signature string          `json:"signature"`
@@ -347,7 +347,7 @@ type requestAuthJSON struct {
 func marshalRequestAuth(a *ethpb.SignedRequestAuthV1) ([]byte, error) {
 	return json.Marshal(signedRequestAuthJSON{
 		Message: requestAuthJSON{
-			Data: string(a.Message.Data),
+			Data: hexutil.Encode(a.Message.Data),
 			Slot: fmt.Sprintf("%d", a.Message.Slot),
 		},
 		Signature: hexutil.Encode(a.Signature),
@@ -367,7 +367,7 @@ type builderPreferencesJSON struct {
 
 // marshalBuilderPreferencesRequest encodes a BuilderPreferencesRequestV1 to its
 // Builder API JSON form (max_execution_payment as a decimal string; auth as in
-// marshalRequestAuth — data plain string (builder URL), slot decimal, signature 0x-hex).
+// marshalRequestAuth — data 0x-hex of the builder URL, slot decimal, signature 0x-hex).
 func marshalBuilderPreferencesRequest(req *ethpb.BuilderPreferencesRequestV1) ([]byte, error) {
 	if req == nil || req.Preferences == nil || req.Auth == nil || req.Auth.Message == nil {
 		return nil, errors.New("incomplete builder preferences request")
@@ -378,7 +378,7 @@ func marshalBuilderPreferencesRequest(req *ethpb.BuilderPreferencesRequestV1) ([
 		},
 		Auth: signedRequestAuthJSON{
 			Message: requestAuthJSON{
-				Data: string(req.Auth.Message.Data),
+				Data: hexutil.Encode(req.Auth.Message.Data),
 				Slot: fmt.Sprintf("%d", req.Auth.Message.Slot),
 			},
 			Signature: hexutil.Encode(req.Auth.Signature),
