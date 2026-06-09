@@ -90,6 +90,7 @@ type validator struct {
 	duties                       *dutyStore
 	signedValidatorRegistrations map[[fieldparams.BLSPubkeyLength]byte]*ethpb.SignedValidatorRegistrationV1
 	submittedPrefSlots           map[primitives.Slot]bool
+	submittedBuilderPrefSlots    map[primitives.Slot]bool
 	proposerSettings             *proposer.Settings
 	web3SignerConfig             *remoteweb3signer.SetupConfig
 	builderURLs                  []string
@@ -850,6 +851,18 @@ func (v *validator) PushProposerSettings(ctx context.Context, slot primitives.Sl
 			}); err != nil {
 				log.WithError(err).Warn("Failed to submit proposer preferences")
 			}
+		}()
+	}
+
+	// Builder preferences for validators proposing next epoch, forwarded to the
+	// configured builders ahead of their proposal (Gloas/ePBS Builder API).
+	builderPrefs := v.buildBuilderPreferences(ctx, slot, false)
+	if len(builderPrefs) > 0 {
+		// Delay to mid-slot so the block for this slot is processed first.
+		delay := time.Duration(params.BeaconConfig().SecondsPerSlot/2) * time.Second
+		go func() {
+			time.Sleep(delay)
+			v.submitBuilderPreferences(ctx, builderPrefs)
 		}()
 	}
 

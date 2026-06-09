@@ -549,6 +549,32 @@ service BeaconNodeValidator {
       body : "*"
     };
   }
+
+  // SubmitBuilderPreferences forwards a proposer's per-builder preferences
+  // (Gloas/ePBS Builder API submitBuilderPreferences) to each target builder.
+  // The beacon node holds the builder client; the validator client supplies the
+  // signed preferences (with a SignedRequestAuthV1 per builder) ahead of its
+  // proposal epoch.
+  rpc SubmitBuilderPreferences(SubmitBuilderPreferencesRequest)
+      returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post : "/eth/v1alpha1/validator/builder_preferences"
+      body : "*"
+    };
+  }
+}
+
+// SubmitBuilderPreferencesRequest carries one proposer's per-builder
+// preferences for forwarding by the beacon node to each target builder. The
+// target builder for each entry is identified by its preferences' auth message
+// data (the builder URL). All entries belong to the validator identified by
+// validator_pubkey (the submitBuilderPreferences path parameter).
+message SubmitBuilderPreferencesRequest {
+  // BLS public key of the proposing validator these preferences belong to.
+  bytes validator_pubkey = 1 [ (ethereum.eth.ext.ssz_size) = "48" ];
+
+  // Per-builder preferences, one entry per target builder.
+  repeated BuilderPreferencesRequestV1 preferences = 2;
 }
 
 // SyncMessageBlockRootResponse for beacon chain validator to retrieve and
