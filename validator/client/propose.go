@@ -77,11 +77,35 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		log.WithError(err).Warn("Could not get graffiti")
 	}
 
+	signedRequestAuths := make([]*ethpb.SignedRequestAuthV1, len(v.builderURLs))
+	for i, url := range v.builderURLs {
+		requestAuth := &ethpb.RequestAuthV1{
+			Data: []byte(url),
+			Slot: slot,
+		}
+		log.WithFields(logrus.Fields{
+			"builderUrl": url,
+			"slot":       slot,
+		}).Info("BHARATH: Creating and signing request auth for builder")
+		signedRequestAuth, err := v.signRequestAuth(ctx, pubKey, requestAuth)
+		if err != nil {
+			log.WithError(err).Error("Failed to sign request auth")
+			return
+		}
+		signedRequestAuths[i] = signedRequestAuth
+	}
+	log.WithFields(logrus.Fields{
+		"builderUrls": v.builderURLs,
+		"count":       len(signedRequestAuths),
+	}).Info("BHARATH: Sending request auths to beacon node in block request")
+
 	// Request block from beacon node
 	b, err := v.validatorClient.BeaconBlock(ctx, &ethpb.BlockRequest{
-		Slot:         slot,
-		RandaoReveal: randaoReveal,
-		Graffiti:     g,
+		Slot:                slot,
+		RandaoReveal:        randaoReveal,
+		Graffiti:            g,
+		BuilderRequestAuths: signedRequestAuths,
+		BuilderUrls:         v.builderURLs,
 	})
 	if err != nil {
 		log.WithField("slot", slot).WithError(err).Error("Failed to request block from beacon node")
@@ -446,6 +470,58 @@ func (v *validator) signBlock(ctx context.Context, pubKey [fieldparams.BLSPubkey
 		return nil, [32]byte{}, errors.Wrap(err, "could not sign block proposal")
 	}
 	return sig.Marshal(), blockRoot, nil
+}
+
+func (v *validator) signRequestAuth(ctx context.Context, pubKey [fieldparams.BLSPubkeyLength]byte, requestAuth *ethpb.RequestAuthV1) (*ethpb.SignedRequestAuthV1, error) {
+	ctx, span := trace.StartSpan(ctx, "validator.signRequestAuth")
+	defer span.End()
+
+	// DOMAIN_REQUEST_AUTH is an application-space domain (0x0B000001). Per spec,
+	// compute_domain(DOMAIN_REQUEST_AUTH) is called with no fork version and no
+	// genesis validators root, so both default to the genesis fork version and a
+	// zero root — it is NOT chain-fork bound. This mirrors how validator
+	// registrations are signed with DomainApplicationBuilder, so we compute the
+	// domain locally rather than via the fork-aware domainData RPC.
+	domain, err := signing.ComputeDomain(
+		params.BeaconConfig().DomainRequestAuth,
+		nil, /* fork version */
+		nil /* genesis validators root */)
+	if err != nil {
+		return nil, err
+	}
+
+	requestAuthRoot, err := signing.ComputeSigningRoot(requestAuth, domain)
+	if err != nil {
+		return nil, errors.Wrap(err, signingRootErr)
+	}
+
+	log.WithFields(logrus.Fields{
+		"builderUrl":  string(requestAuth.Data),
+		"slot":        requestAuth.Slot,
+		"pubkey":      fmt.Sprintf("%#x", bytesutil.Trunc(pubKey[:])),
+		"domain":      fmt.Sprintf("%#x", domain),
+		"signingRoot": fmt.Sprintf("%#x", requestAuthRoot),
+	}).Info("BHARATH: Computed request auth signing root, signing")
+
+	sig, err := v.km.Sign(ctx, &validatorpb.SignRequest{
+		PublicKey:       pubKey[:],
+		SigningRoot:     requestAuthRoot[:],
+		SignatureDomain: domain,
+		Object:          &validatorpb.SignRequest_RequestAuth{RequestAuth: requestAuth},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "could not sign request auth")
+	}
+	signedAuth := &ethpb.SignedRequestAuthV1{
+		Message:   requestAuth,
+		Signature: sig.Marshal(),
+	}
+	log.WithFields(logrus.Fields{
+		"builderUrl": string(requestAuth.Data),
+		"slot":       requestAuth.Slot,
+		"signature":  fmt.Sprintf("%#x", signedAuth.Signature),
+	}).Info("BHARATH: Signed request auth")
+	return signedAuth, nil
 }
 
 // Sign voluntary exit with proposer domain and private key.

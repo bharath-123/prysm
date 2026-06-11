@@ -549,6 +549,32 @@ service BeaconNodeValidator {
       body : "*"
     };
   }
+
+  // SubmitBuilderPreferences forwards a proposer's per-builder preferences
+  // (Gloas/ePBS Builder API submitBuilderPreferences) to each target builder.
+  // The beacon node holds the builder client; the validator client supplies the
+  // signed preferences (with a SignedRequestAuthV1 per builder) ahead of its
+  // proposal epoch.
+  rpc SubmitBuilderPreferences(SubmitBuilderPreferencesRequest)
+      returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post : "/eth/v1alpha1/validator/builder_preferences"
+      body : "*"
+    };
+  }
+}
+
+// SubmitBuilderPreferencesRequest carries one proposer's per-builder
+// preferences for forwarding by the beacon node to each target builder. The
+// target builder for each entry is identified by its preferences' auth message
+// data (the builder URL). All entries belong to the validator identified by
+// validator_pubkey (the submitBuilderPreferences path parameter).
+message SubmitBuilderPreferencesRequest {
+  // BLS public key of the proposing validator these preferences belong to.
+  bytes validator_pubkey = 1 [ (ethereum.eth.ext.ssz_size) = "48" ];
+
+  // Per-builder preferences, one entry per target builder.
+  repeated BuilderPreferencesRequestV1 preferences = 2;
 }
 
 // SyncMessageBlockRootResponse for beacon chain validator to retrieve and
@@ -967,6 +993,17 @@ message BlockRequest {
   // include_payload=true so the envelope is immediately available with a
   // populated state root.
   bool eager_payload_state_root = 6;
+
+  // Gloas (post-ePBS) Builder API request authentications, one per builder the
+  // proposer wants bids from. The validator client signs a RequestAuthV1 per
+  // builder (binding builder_url + slot) and the beacon node forwards each as
+  // the SignedRequestAuthV1 body of the corresponding getExecutionPayloadBid
+  // request.
+  repeated SignedRequestAuthV1 builder_request_auths = 7;
+
+  // Gloas (post-ePBS) Builder API builder URLs the proposer wants bids from.
+  // The beacon node fans out getExecutionPayloadBid to each of these URLs.
+  repeated string builder_urls = 8;
 }
 
 message ProposeResponse {

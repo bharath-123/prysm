@@ -111,7 +111,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 		builderBoostFactor = primitives.Gwei(req.BuilderBoostFactor.Value)
 	}
 
-	resp, err := vs.BuildBlockParallel(ctx, sBlk, head, req.SkipMevBoost, builderBoostFactor, full)
+	resp, err := vs.BuildBlockParallel(ctx, sBlk, head, req.SkipMevBoost, builderBoostFactor, full, req.BuilderUrls, req.BuilderRequestAuths)
 	l := log.WithFields(logrus.Fields{
 		"sinceSlotStartTime": time.Since(t),
 		"validator":          sBlk.Block().ProposerIndex(),
@@ -191,7 +191,13 @@ func (vs *Server) getParentState(ctx context.Context, slot primitives.Slot) (sta
 	return head, parentRoot, vs.ForkchoiceFetcher.FullBeatsEmpty(parentRoot), err
 }
 
-func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, skipMevBoost bool, builderBoostFactor primitives.Gwei, parentFull bool) (*ethpb.GenericBeaconBlock, error) {
+func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.SignedBeaconBlock, head state.BeaconState, skipMevBoost bool, builderBoostFactor primitives.Gwei, parentFull bool, builderUrls []string, builderRequestAuths []*ethpb.SignedRequestAuthV1) (*ethpb.GenericBeaconBlock, error) {
+	if sBlk.Version() >= version.Gloas && parentFull {
+		if err := vs.applyParentExecutionPayloadToHead(ctx, head, sBlk.Block().ParentRoot()); err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not apply parent execution payload: %v", err)
+		}
+	}
+
 	// Build consensus fields in background
 	var wg sync.WaitGroup
 	wg.Go(func() {
@@ -247,6 +253,7 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 
 	winningBid := primitives.ZeroWei()
 	selfBuildEnvelope := true
+	var selectedBid *cache.BidType
 	var bundle enginev1.BlobsBundler
 	var local *blocks.GetPayloadResponse
 	if sBlk.Version() >= version.Bellatrix {
@@ -278,10 +285,15 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 			}
 		} else {
 			selfBuildOnly := local.OverrideBuilder || skipMevBoost
-			selfBuildEnvelope, err = vs.setExecutionPayloadBid(ctx, sBlk, local, selfBuildOnly)
+			var builderBids map[string]*ethpb.SignedExecutionPayloadBid
+			if !selfBuildOnly {
+				builderBids = vs.getBuilderExecutionPayloadBids(ctx, sBlk, head, local, builderUrls, builderRequestAuths)
+			}
+			selectedBid, err = vs.setExecutionPayloadBid(ctx, sBlk, local, selfBuildOnly, builderBids)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "Could not set execution data for Gloas: %v", err)
 			}
+			selfBuildEnvelope = selectedBid.SelfBuild
 		}
 	}
 
@@ -292,6 +304,17 @@ func (vs *Server) BuildBlockParallel(ctx context.Context, sBlk interfaces.Signed
 		return nil, status.Errorf(codes.Internal, "Could not compute state root: %v", err)
 	}
 	sBlk.SetStateRoot(sr)
+
+	// Cache the selected bid keyed by the final block root (state root now set, so
+	// this matches the root ProposeBeaconBlock computes) so ProposeBeaconBlock can
+	// submit the block back to the winning builder for a Builder-API bid.
+	if sBlk.Version() >= version.Gloas && selectedBid != nil {
+		blockRoot, rootErr := sBlk.Block().HashTreeRoot()
+		if rootErr != nil {
+			return nil, status.Errorf(codes.Internal, "Could not compute block root for selected bid cache: %v", rootErr)
+		}
+		vs.SelectedBidCache.Set(blockRoot, selectedBid)
+	}
 
 	// For Gloas self-build, cache the execution payload envelope now that the block is fully built.
 	if sBlk.Version() >= version.Gloas && selfBuildEnvelope {
@@ -372,6 +395,21 @@ func (vs *Server) ProposeBeaconBlock(ctx context.Context, req *ethpb.GenericSign
 	}
 	if err := <-errChan; err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not broadcast/receive block: %v", err)
+	}
+
+	// For a Gloas block built from a Builder-API bid, submit the signed block back
+	// to the winning builder so it can reveal the execution payload envelope. The
+	// block is already broadcast, so a submission failure is logged, not fatal.
+	if block.Version() >= version.Gloas {
+		if bid, ok := vs.SelectedBidCache.Get(root); ok {
+			vs.SelectedBidCache.Delete(root)
+			if bid.IsBuilderApiBid {
+				log.Info("BHARATH: Submitting beacon block to builder")
+				if err := vs.BlockBuilder.SubmitBeaconBlock(ctx, bid.BuilderUrl, block); err != nil {
+					log.WithError(err).WithField("builder", bid.BuilderUrl).Error("Could not submit beacon block to builder")
+				}
+			}
+		}
 	}
 
 	return &ethpb.ProposeResponse{BlockRoot: root[:]}, nil

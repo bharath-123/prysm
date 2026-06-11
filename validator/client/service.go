@@ -13,6 +13,7 @@ import (
 	"github.com/OffchainLabs/prysm/v7/consensus-types/primitives"
 	ethpb "github.com/OffchainLabs/prysm/v7/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v7/validator/accounts/wallet"
+	beaconApi "github.com/OffchainLabs/prysm/v7/validator/client/beacon-api"
 	beaconChainClientFactory "github.com/OffchainLabs/prysm/v7/validator/client/beacon-chain-client-factory"
 	"github.com/OffchainLabs/prysm/v7/validator/client/iface"
 	nodeclientfactory "github.com/OffchainLabs/prysm/v7/validator/client/node-client-factory"
@@ -38,57 +39,63 @@ import (
 // ValidatorService represents a service to manage the validator client
 // routine.
 type ValidatorService struct {
-	ctx                     context.Context
-	cancel                  context.CancelFunc
-	validator               iface.Validator
-	db                      db.Database
-	conn                    validatorHelpers.NodeConnection
-	wallet                  *wallet.Wallet
-	walletInitializedFeed   *event.Feed
-	graffiti                []byte
-	graffitiStruct          *graffiti.Graffiti
-	interopKeysConfig       *local.InteropKeymanagerConfig
-	web3SignerConfig        *remoteweb3signer.SetupConfig
-	proposerSettings        *proposer.Settings
-	maxHealthChecks         int
-	validatorsRegBatchSize  int
-	enableAPI               bool
-	emitAccountMetrics      bool
-	logValidatorPerformance bool
-	distributed             bool
-	disableDutiesPolling    bool
-	closeClientFunc         func() // validator client stop function is used here
+	ctx                        context.Context
+	cancel                     context.CancelFunc
+	validator                  iface.Validator
+	db                         db.Database
+	conn                       validatorHelpers.NodeConnection
+	wallet                     *wallet.Wallet
+	walletInitializedFeed      *event.Feed
+	graffiti                   []byte
+	graffitiStruct             *graffiti.Graffiti
+	interopKeysConfig          *local.InteropKeymanagerConfig
+	web3SignerConfig           *remoteweb3signer.SetupConfig
+	proposerSettings           *proposer.Settings
+	builderURLs                []string
+	builderMaxExecutionPayment uint64
+	maxHealthChecks            int
+	validatorsRegBatchSize     int
+	enableAPI                  bool
+	emitAccountMetrics         bool
+	logValidatorPerformance    bool
+	distributed                bool
+	disableDutiesPolling       bool
+	stateless                  bool
+	closeClientFunc            func() // validator client stop function is used here
 }
 
 // Config for the validator service.
 type Config struct {
-	Validator               iface.Validator
-	DB                      db.Database
-	Wallet                  *wallet.Wallet
-	WalletInitializedFeed   *event.Feed
-	Conn                    validatorHelpers.NodeConnection // Optional: pre-built connection (if nil, built from endpoint configs)
-	MaxHealthChecks         int
-	GRPCMaxCallRecvMsgSize  int
-	GRPCRetries             uint
-	GRPCRetryDelay          time.Duration
-	GRPCHeaders             []string
-	BeaconNodeGRPCEndpoint  string
-	BeaconNodeCert          string
-	BeaconApiEndpoint       string
-	BeaconApiHeaders        map[string][]string
-	BeaconApiTimeout        time.Duration
-	Graffiti                string
-	GraffitiStruct          *graffiti.Graffiti
-	InteropKmConfig         *local.InteropKeymanagerConfig
-	Web3SignerConfig        *remoteweb3signer.SetupConfig
-	ProposerSettings        *proposer.Settings
-	ValidatorsRegBatchSize  int
-	EnableAPI               bool
-	LogValidatorPerformance bool
-	EmitAccountMetrics      bool
-	Distributed             bool
-	DisableDutiesPolling    bool
-	CloseClientFunc         func()
+	Validator                  iface.Validator
+	DB                         db.Database
+	Wallet                     *wallet.Wallet
+	WalletInitializedFeed      *event.Feed
+	Conn                       validatorHelpers.NodeConnection // Optional: pre-built connection (if nil, built from endpoint configs)
+	MaxHealthChecks            int
+	GRPCMaxCallRecvMsgSize     int
+	GRPCRetries                uint
+	GRPCRetryDelay             time.Duration
+	GRPCHeaders                []string
+	BeaconNodeGRPCEndpoint     string
+	BeaconNodeCert             string
+	BeaconApiEndpoint          string
+	BeaconApiHeaders           map[string][]string
+	BeaconApiTimeout           time.Duration
+	Graffiti                   string
+	GraffitiStruct             *graffiti.Graffiti
+	InteropKmConfig            *local.InteropKeymanagerConfig
+	Web3SignerConfig           *remoteweb3signer.SetupConfig
+	ProposerSettings           *proposer.Settings
+	BuilderURLs                []string
+	BuilderMaxExecutionPayment uint64
+	ValidatorsRegBatchSize     int
+	EnableAPI                  bool
+	LogValidatorPerformance    bool
+	EmitAccountMetrics         bool
+	Distributed                bool
+	DisableDutiesPolling       bool
+	Stateless                  bool
+	CloseClientFunc            func()
 }
 
 // NewValidatorService creates a new validator service for the service
@@ -96,25 +103,28 @@ type Config struct {
 func NewValidatorService(ctx context.Context, cfg *Config) (*ValidatorService, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	s := &ValidatorService{
-		ctx:                     ctx,
-		cancel:                  cancel,
-		validator:               cfg.Validator,
-		db:                      cfg.DB,
-		wallet:                  cfg.Wallet,
-		walletInitializedFeed:   cfg.WalletInitializedFeed,
-		graffiti:                []byte(cfg.Graffiti),
-		graffitiStruct:          cfg.GraffitiStruct,
-		interopKeysConfig:       cfg.InteropKmConfig,
-		web3SignerConfig:        cfg.Web3SignerConfig,
-		proposerSettings:        cfg.ProposerSettings,
-		validatorsRegBatchSize:  cfg.ValidatorsRegBatchSize,
-		enableAPI:               cfg.EnableAPI,
-		emitAccountMetrics:      cfg.EmitAccountMetrics,
-		logValidatorPerformance: cfg.LogValidatorPerformance,
-		distributed:             cfg.Distributed,
-		disableDutiesPolling:    cfg.DisableDutiesPolling,
-		closeClientFunc:         cfg.CloseClientFunc,
-		maxHealthChecks:         cfg.MaxHealthChecks,
+		ctx:                        ctx,
+		cancel:                     cancel,
+		validator:                  cfg.Validator,
+		db:                         cfg.DB,
+		wallet:                     cfg.Wallet,
+		walletInitializedFeed:      cfg.WalletInitializedFeed,
+		graffiti:                   []byte(cfg.Graffiti),
+		graffitiStruct:             cfg.GraffitiStruct,
+		interopKeysConfig:          cfg.InteropKmConfig,
+		web3SignerConfig:           cfg.Web3SignerConfig,
+		proposerSettings:           cfg.ProposerSettings,
+		builderURLs:                cfg.BuilderURLs,
+		builderMaxExecutionPayment: cfg.BuilderMaxExecutionPayment,
+		validatorsRegBatchSize:     cfg.ValidatorsRegBatchSize,
+		enableAPI:                  cfg.EnableAPI,
+		emitAccountMetrics:         cfg.EmitAccountMetrics,
+		logValidatorPerformance:    cfg.LogValidatorPerformance,
+		distributed:                cfg.Distributed,
+		disableDutiesPolling:       cfg.DisableDutiesPolling,
+		stateless:                  cfg.Stateless,
+		closeClientFunc:            cfg.CloseClientFunc,
+		maxHealthChecks:            cfg.MaxHealthChecks,
 	}
 
 	// Use pre-built connection if provided
@@ -188,7 +198,7 @@ func (v *ValidatorService) Start() {
 		return
 	}
 
-	validatorClient := validatorclientfactory.NewValidatorClient(v.conn)
+	validatorClient := validatorclientfactory.NewValidatorClient(v.conn, beaconApi.WithStateless(v.stateless))
 
 	v.validator = &validator{
 		slotFeed:                     new(event.Feed),
@@ -211,6 +221,8 @@ func (v *ValidatorService) Start() {
 		km:                           nil,
 		web3SignerConfig:             v.web3SignerConfig,
 		proposerSettings:             v.proposerSettings,
+		builderURLs:                  v.builderURLs,
+		builderMaxExecutionPayment:   v.builderMaxExecutionPayment,
 		signedValidatorRegistrations: make(map[[fieldparams.BLSPubkeyLength]byte]*ethpb.SignedValidatorRegistrationV1),
 		validatorsRegBatchSize:       v.validatorsRegBatchSize,
 		interopKeysConfig:            v.interopKeysConfig,
@@ -224,6 +236,7 @@ func (v *ValidatorService) Start() {
 		enableAPI:                    v.enableAPI,
 		duties:                       &dutyStore{},
 		submittedPrefSlots:           make(map[primitives.Slot]bool),
+		submittedBuilderPrefSlots:    make(map[primitives.Slot]bool),
 		distributed:                  v.distributed,
 		disableDutiesPolling:         v.disableDutiesPolling,
 		accountsChangedChannel:       make(chan [][fieldparams.BLSPubkeyLength]byte, 1),

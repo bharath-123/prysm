@@ -410,31 +410,39 @@ func (c *ValidatorClient) registerValidatorService(cliCtx *cli.Context) error {
 		return err
 	}
 
+	stateless := cliCtx.Bool(flags.EnableStatelessFlag.Name)
+	if stateless && !features.Get().EnableBeaconRESTApi {
+		log.Warnf("--%s requires --%s; the flag will be ignored.", flags.EnableStatelessFlag.Name, features.EnableBeaconRESTApi.Name)
+	}
+
 	validatorService, err := client.NewValidatorService(cliCtx.Context, &client.Config{
-		DB:                      c.db,
-		Wallet:                  c.wallet,
-		WalletInitializedFeed:   c.walletInitializedFeed,
-		GRPCMaxCallRecvMsgSize:  cliCtx.Int(cmd.GrpcMaxCallRecvMsgSizeFlag.Name),
-		GRPCRetries:             cliCtx.Uint(flags.GRPCRetriesFlag.Name),
-		GRPCRetryDelay:          cliCtx.Duration(flags.GRPCRetryDelayFlag.Name),
-		GRPCHeaders:             strings.Split(cliCtx.String(flags.GRPCHeadersFlag.Name), ","),
-		BeaconNodeGRPCEndpoint:  cliCtx.String(flags.BeaconRPCProviderFlag.Name),
-		BeaconNodeCert:          cliCtx.String(flags.CertFlag.Name),
-		BeaconApiEndpoint:       cliCtx.String(flags.BeaconRESTApiProviderFlag.Name),
-		BeaconApiHeaders:        parseBeaconApiHeaders(cliCtx.String(flags.BeaconRESTApiHeaders.Name)),
-		BeaconApiTimeout:        time.Second * 30,
-		Graffiti:                g.ParseHexGraffiti(cliCtx.String(flags.GraffitiFlag.Name)),
-		GraffitiStruct:          graffitiStruct,
-		InteropKmConfig:         interopKmConfig,
-		Web3SignerConfig:        web3signerConfig,
-		ProposerSettings:        ps,
-		ValidatorsRegBatchSize:  cliCtx.Int(flags.ValidatorsRegistrationBatchSizeFlag.Name),
-		EnableAPI:               features.Get().EnableWeb || cliCtx.Bool(flags.EnableRPCFlag.Name),
-		LogValidatorPerformance: !cliCtx.Bool(flags.DisablePenaltyRewardLogFlag.Name),
-		EmitAccountMetrics:      !cliCtx.Bool(flags.DisableAccountMetricsFlag.Name),
-		Distributed:             cliCtx.Bool(flags.EnableDistributed.Name),
-		CloseClientFunc:         c.Close,
-		MaxHealthChecks:         cliCtx.Int(flags.MaxHealthChecksFlag.Name),
+		DB:                         c.db,
+		Wallet:                     c.wallet,
+		WalletInitializedFeed:      c.walletInitializedFeed,
+		GRPCMaxCallRecvMsgSize:     cliCtx.Int(cmd.GrpcMaxCallRecvMsgSizeFlag.Name),
+		GRPCRetries:                cliCtx.Uint(flags.GRPCRetriesFlag.Name),
+		GRPCRetryDelay:             cliCtx.Duration(flags.GRPCRetryDelayFlag.Name),
+		GRPCHeaders:                strings.Split(cliCtx.String(flags.GRPCHeadersFlag.Name), ","),
+		BeaconNodeGRPCEndpoint:     cliCtx.String(flags.BeaconRPCProviderFlag.Name),
+		BeaconNodeCert:             cliCtx.String(flags.CertFlag.Name),
+		BeaconApiEndpoint:          cliCtx.String(flags.BeaconRESTApiProviderFlag.Name),
+		BeaconApiHeaders:           parseBeaconApiHeaders(cliCtx.String(flags.BeaconRESTApiHeaders.Name)),
+		BeaconApiTimeout:           time.Second * 30,
+		Graffiti:                   g.ParseHexGraffiti(cliCtx.String(flags.GraffitiFlag.Name)),
+		GraffitiStruct:             graffitiStruct,
+		InteropKmConfig:            interopKmConfig,
+		Web3SignerConfig:           web3signerConfig,
+		ProposerSettings:           ps,
+		BuilderURLs:                splitBuilderURLs(cliCtx.String(flags.BuilderURLs.Name)),
+		BuilderMaxExecutionPayment: cliCtx.Uint64(flags.BuilderMaxExecutionPayment.Name),
+		ValidatorsRegBatchSize:     cliCtx.Int(flags.ValidatorsRegistrationBatchSizeFlag.Name),
+		EnableAPI:                  features.Get().EnableWeb || cliCtx.Bool(flags.EnableRPCFlag.Name),
+		LogValidatorPerformance:    !cliCtx.Bool(flags.DisablePenaltyRewardLogFlag.Name),
+		EmitAccountMetrics:         !cliCtx.Bool(flags.DisableAccountMetricsFlag.Name),
+		Distributed:                cliCtx.Bool(flags.EnableDistributed.Name),
+		Stateless:                  stateless,
+		CloseClientFunc:            c.Close,
+		MaxHealthChecks:            cliCtx.Int(flags.MaxHealthChecksFlag.Name),
 	})
 	if err != nil {
 		return errors.Wrap(err, "could not initialize validator service")
@@ -645,4 +653,17 @@ func parseBeaconApiHeaders(rawHeaders string) map[string][]string {
 		result[key] = append(result[key], value)
 	}
 	return result
+}
+
+// splitBuilderURLs parses a comma-separated list of builder URLs, trimming
+// whitespace and dropping empty entries.
+func splitBuilderURLs(raw string) []string {
+	parts := strings.Split(raw, ",")
+	hosts := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			hosts = append(hosts, s)
+		}
+	}
+	return hosts
 }

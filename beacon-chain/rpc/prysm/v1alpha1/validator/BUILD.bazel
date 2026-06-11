@@ -8,6 +8,7 @@ go_library(
         "aggregator.go",
         "attester.go",
         "blocks.go",
+        "builder_preferences.go",
         "construct_generic_block.go",
         "duties.go",
         "duties_v2.go",
@@ -122,6 +123,7 @@ go_library(
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//types/known/emptypb:go_default_library",
         "@org_golang_x_sync//errgroup:go_default_library",
+        "@org_golang_x_sync//singleflight:go_default_library",
     ],
 )
 

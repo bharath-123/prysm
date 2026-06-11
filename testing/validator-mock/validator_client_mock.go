@@ -402,6 +402,21 @@ func (mr *MockValidatorClientMockRecorder) SubmitSignedProposerPreferences(ctx, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitSignedProposerPreferences", reflect.TypeOf((*MockValidatorClient)(nil).SubmitSignedProposerPreferences), ctx, in)
 }
 
+// SubmitBuilderPreferences mocks base method.
+func (m *MockValidatorClient) SubmitBuilderPreferences(ctx context.Context, in *eth.SubmitBuilderPreferencesRequest) (*empty.Empty, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubmitBuilderPreferences", ctx, in)
+	ret0, _ := ret[0].(*empty.Empty)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SubmitBuilderPreferences indicates an expected call of SubmitBuilderPreferences.
+func (mr *MockValidatorClientMockRecorder) SubmitBuilderPreferences(ctx, in any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitBuilderPreferences", reflect.TypeOf((*MockValidatorClient)(nil).SubmitBuilderPreferences), ctx, in)
+}
+
 // SubmitSignedExecutionPayloadBid mocks base method.
 func (m *MockValidatorClient) SubmitSignedExecutionPayloadBid(ctx context.Context, in *eth.SignedExecutionPayloadBid) (*empty.Empty, error) {
 	m.ctrl.T.Helper()

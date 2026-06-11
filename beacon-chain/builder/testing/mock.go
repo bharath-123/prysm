@@ -39,6 +39,10 @@ type MockBuilderService struct {
 	RegistrationCache             *cache.RegistrationCache
 	ErrGetHeader                  error
 	ErrRegisterValidator          error
+	Bids                          map[string]*ethpb.SignedExecutionPayloadBid
+	ErrGetExecutionPayloadBid     error
+	ErrSubmitBeaconBlock          error
+	ErrSubmitBuilderPreferences   error
 	Cfg                           *Config
 }
 
@@ -99,6 +103,21 @@ func (s *MockBuilderService) GetHeader(_ context.Context, slot primitives.Slot, 
 		return nil, errors.Wrap(err, "could not wrap capella bid")
 	}
 	return w, s.ErrGetHeader
+}
+
+// GetExecutionPayloadBid for mocking.
+func (s *MockBuilderService) GetExecutionPayloadBid(_ context.Context, _ []string, _ []*ethpb.SignedRequestAuthV1, _ primitives.Slot, _ [32]byte, _ [32]byte, _ [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
+	return s.Bids, s.ErrGetExecutionPayloadBid
+}
+
+// SubmitBeaconBlock for mocking.
+func (s *MockBuilderService) SubmitBeaconBlock(_ context.Context, _ string, _ interfaces.ReadOnlySignedBeaconBlock) error {
+	return s.ErrSubmitBeaconBlock
+}
+
+// SubmitBuilderPreferences for mocking.
+func (s *MockBuilderService) SubmitBuilderPreferences(_ context.Context, _ [48]byte, _ map[string]*ethpb.BuilderPreferencesRequestV1) error {
+	return s.ErrSubmitBuilderPreferences
 }
 
 // RegistrationByValidatorID returns either the values from the cache or db.

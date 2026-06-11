@@ -7,6 +7,7 @@ go_library(
         "client.go",
         "errors.go",
         "log.go",
+        "multiclient.go",
         "types.go",
     ],
     importpath = "github.com/OffchainLabs/prysm/v7/api/client/builder",
@@ -41,6 +42,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "client_test.go",
+        "multiclient_test.go",
         "types_test.go",
     ],
     data = glob(["testdata/**"]),

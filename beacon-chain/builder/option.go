@@ -31,6 +31,20 @@ func FlagOptions(c *cli.Context) ([]Option, error) {
 	opts := []Option{
 		WithBuilderClient(client),
 	}
+
+	// Gloas (post-ePBS) builders are connected to directly via a multi-builder
+	// client. The set of builders to query is supplied per request by the
+	// validator client (in the BlockRequest), so this client holds no URLs of its
+	// own and is constructed unconditionally.
+	var mopts []builder.MultiClientOpt
+	if sszEnabled {
+		mopts = append(mopts, builder.WithMultiClientSSZ())
+	}
+	multiClient, err := builder.NewMultiClient(mopts...)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, WithMultiBuilderClient(multiClient))
 	return opts, nil
 }
 
@@ -38,6 +52,15 @@ func FlagOptions(c *cli.Context) ([]Option, error) {
 func WithBuilderClient(client builder.BuilderClient) Option {
 	return func(s *Service) error {
 		s.cfg.builderClient = client
+		return nil
+	}
+}
+
+// WithMultiBuilderClient sets the multi-builder (Gloas) client used to query
+// builders directly via the post-ePBS Builder API.
+func WithMultiBuilderClient(client builder.MultiBuilderClient) Option {
+	return func(s *Service) error {
+		s.cfg.multiBuilderClient = client
 		return nil
 	}
 }

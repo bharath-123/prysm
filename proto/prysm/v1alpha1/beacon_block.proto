@@ -235,6 +235,49 @@ message ValidatorRegistrationV1 {
   bytes pubkey = 4 [ (ethereum.eth.ext.ssz_size) = "48" ];
 }
 
+// RequestAuthV1 authenticates a proposer's `getExecutionPayloadBid` request to
+// a builder (Gloas/ePBS Builder API). The proposer signs it and sends the
+// resulting SignedRequestAuthV1 in the request body. The per-builder `data`
+// binding (set to the builder's URL) prevents one builder from replaying a
+// request intended for another.
+message RequestAuthV1 {
+  // Authentication data, which MUST be set to the URL of the builder the request
+  // is intended for. Per spec this is a ByteList[MAX_DATA_SIZE]
+  // (MAX_DATA_SIZE = 4096); modeled as `bytes` with an ssz_max so the container
+  // has a generated SSZ HashTreeRoot, which is required to compute the signing
+  // root over DOMAIN_REQUEST_AUTH.
+  bytes data = 1 [ (ethereum.eth.ext.ssz_max) = "4096" ];
+
+  // Slot for which the bid is being requested.
+  uint64 slot = 2 [
+    (ethereum.eth.ext.cast_type) =
+        "github.com/OffchainLabs/prysm/v7/consensus-types/primitives.Slot"
+  ];
+}
+
+message SignedRequestAuthV1 {
+  RequestAuthV1 message = 1;
+
+  // 96 byte BLS signature over the RequestAuthV1 message.
+  bytes signature = 2 [ (ethereum.eth.ext.ssz_size) = "96" ];
+}
+
+// BuilderPreferencesV1 holds the per-builder preferences a proposer expresses
+// via the `submitBuilderPreferences` endpoint (Gloas/ePBS Builder API).
+message BuilderPreferencesV1 {
+  // Maximum amount (Gwei) the proposer is willing to accept as an execution
+  // payment from this builder.
+  uint64 max_execution_payment = 1;
+}
+
+// BuilderPreferencesRequestV1 is the body of `submitBuilderPreferences`: the
+// proposer's preferences plus a SignedRequestAuthV1 that authenticates the
+// submission to the target builder.
+message BuilderPreferencesRequestV1 {
+  BuilderPreferencesV1 preferences = 1;
+  SignedRequestAuthV1 auth = 2;
+}
+
 message SignedBuilderBid {
   BuilderBid message = 1;
   bytes signature = 2 [ (ethereum.eth.ext.ssz_size) = "96" ];

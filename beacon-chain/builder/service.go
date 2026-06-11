@@ -27,6 +27,9 @@ type BlockBuilder interface {
 	SubmitBlindedBlock(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) (interfaces.ExecutionData, v1.BlobsBundler, error)
 	SubmitBlindedBlockPostFulu(ctx context.Context, block interfaces.ReadOnlySignedBeaconBlock) error
 	GetHeader(ctx context.Context, slot primitives.Slot, parentHash [32]byte, pubKey [48]byte) (builder.SignedBid, error)
+	GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error)
+	SubmitBeaconBlock(ctx context.Context, builderURL string, block interfaces.ReadOnlySignedBeaconBlock) error
+	SubmitBuilderPreferences(ctx context.Context, validatorPubkey [48]byte, prefsByURL map[string]*ethpb.BuilderPreferencesRequestV1) error
 	RegisterValidator(ctx context.Context, reg []*ethpb.SignedValidatorRegistrationV1) error
 	RegistrationByValidatorID(ctx context.Context, id primitives.ValidatorIndex) (*ethpb.ValidatorRegistrationV1, error)
 	Configured() bool
@@ -34,15 +37,17 @@ type BlockBuilder interface {
 
 // config defines a config struct for dependencies into the service.
 type config struct {
-	builderClient builder.BuilderClient
-	beaconDB      db.HeadAccessDatabase
-	headFetcher   blockchain.HeadFetcher
+	builderClient      builder.BuilderClient
+	multiBuilderClient builder.MultiBuilderClient
+	beaconDB           db.HeadAccessDatabase
+	headFetcher        blockchain.HeadFetcher
 }
 
 // Service defines a service that provides a client for interacting with the beacon chain and MEV relay network.
 type Service struct {
 	cfg               *config
 	c                 builder.BuilderClient
+	mc                builder.MultiBuilderClient
 	ctx               context.Context
 	cancel            context.CancelFunc
 	registrationCache *cache.RegistrationCache
@@ -72,6 +77,9 @@ func NewService(ctx context.Context, opts ...Option) (*Service, error) {
 			log.Warn("Outsourcing block construction to external builders adds non-trivial delay to block propagation time. " +
 				"Builder-constructed blocks or fallback blocks may get orphaned. Use at your own risk!")
 		}
+	}
+	if s.cfg.multiBuilderClient != nil && !reflect.ValueOf(s.cfg.multiBuilderClient).IsNil() {
+		s.mc = s.cfg.multiBuilderClient
 	}
 	return s, nil
 }
@@ -134,6 +142,55 @@ func (s *Service) GetHeader(ctx context.Context, slot primitives.Slot, parentHas
 	h, err := s.c.GetHeader(ctx, slot, parentHash, pubKey)
 	tracing.AnnotateError(span, err)
 	return h, err
+}
+
+// GetExecutionPayloadBid requests execution payload bids from the given Gloas
+// builder URLs for the (slot, parentHash, parentRoot, proposer pubkey) tuple and
+// returns the bids that were served successfully. The URLs and their matching
+// request auths are supplied by the validator client (via the BlockRequest), not
+// by beacon-node configuration.
+func (s *Service) GetExecutionPayloadBid(ctx context.Context, urls []string, auths []*ethpb.SignedRequestAuthV1, slot primitives.Slot, parentHash [32]byte, parentRoot [32]byte, pubKey [48]byte) (map[string]*ethpb.SignedExecutionPayloadBid, error) {
+	ctx, span := trace.StartSpan(ctx, "builder.GetExecutionPayloadBid")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		getExecutionPayloadBidLatency.Observe(float64(time.Since(start).Milliseconds()))
+	}()
+	if s.mc == nil {
+		tracing.AnnotateError(span, ErrNoBuilder)
+		return nil, ErrNoBuilder
+	}
+
+	bids, err := s.mc.GetExecutionPayloadBid(ctx, urls, auths, slot, parentHash, parentRoot, pubKey)
+	tracing.AnnotateError(span, err)
+	return bids, err
+}
+
+// SubmitBeaconBlock submits the signed beacon block back to the single Gloas
+// builder (identified by builderURL) whose bid was selected for this block.
+func (s *Service) SubmitBeaconBlock(ctx context.Context, builderURL string, b interfaces.ReadOnlySignedBeaconBlock) error {
+	ctx, span := trace.StartSpan(ctx, "builder.SubmitBeaconBlock")
+	defer span.End()
+	start := time.Now()
+	defer func() {
+		submitBeaconBlockLatency.Observe(float64(time.Since(start).Milliseconds()))
+	}()
+	if s.mc == nil {
+		return ErrNoBuilder
+	}
+	return s.mc.SubmitBeaconBlock(ctx, builderURL, b)
+}
+
+// SubmitBuilderPreferences submits the proposer's per-builder preferences to the
+// Gloas builders named in prefsByURL. The builder URLs and the matching request
+// auths originate from the validator client.
+func (s *Service) SubmitBuilderPreferences(ctx context.Context, validatorPubkey [48]byte, prefsByURL map[string]*ethpb.BuilderPreferencesRequestV1) error {
+	ctx, span := trace.StartSpan(ctx, "builder.SubmitBuilderPreferences")
+	defer span.End()
+	if s.mc == nil {
+		return ErrNoBuilder
+	}
+	return s.mc.SubmitBuilderPreferences(ctx, validatorPubkey, prefsByURL)
 }
 
 // Status retrieves the status of the builder relay network.

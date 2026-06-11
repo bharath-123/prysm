@@ -4,6 +4,7 @@ package flags
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -385,6 +386,20 @@ var (
 		Usage: "Sets gas limit for the builder to use for constructing a payload for all the validators.",
 		Value: fmt.Sprint(params.BeaconConfig().DefaultBuilderGasLimit),
 	}
+	// BuilderURLs is a comma-separated list of Gloas (post-ePBS) builder HTTP
+	// endpoints the validator queries directly when performing proposer duties.
+	BuilderURLs = &cli.StringFlag{
+		Name:  "builder-urls",
+		Usage: "Comma-separated list of Gloas (post-ePBS) builder HTTP endpoints the validator connects to directly when proposing, e.g. https://builder-a:18550,https://builder-b:18550",
+		Value: "",
+	}
+	// BuilderMaxExecutionPayment is the max_execution_payment (Gwei) the proposer
+	// advertises to every builder via submitBuilderPreferences (Gloas Builder API).
+	BuilderMaxExecutionPayment = &cli.Uint64Flag{
+		Name:  "builder-max-execution-payment",
+		Usage: "Maximum execution-layer payment (Gwei) the proposer will accept from any builder, sent to each builder via submitBuilderPreferences. Defaults to MAX_EXECUTION_PAYMENT (2**64-1, accept any).",
+		Value: math.MaxUint64,
+	}
 	// ValidatorsRegistrationBatchSizeFlag sets the maximum size for one batch of validator registrations. Use a non-positive value to disable batching.
 	ValidatorsRegistrationBatchSizeFlag = &cli.IntFlag{
 		Name:  "validators-registration-batch-size",
@@ -395,6 +410,13 @@ var (
 	EnableDistributed = &cli.BoolFlag{
 		Name:  "distributed",
 		Usage: "To enable the use of prysm validator client in Distributed Validator Cluster",
+		Value: false,
+	}
+	// EnableStatelessFlag enables the stateless block production path for Gloas: the validator requests the
+	// block and execution payload envelope in a single v4 call instead of fetching them in two separate calls.
+	EnableStatelessFlag = &cli.BoolFlag{
+		Name:  "stateless",
+		Usage: fmt.Sprintf("Enables stateless block production for Gloas. The validator requests block and execution payload envelope in a single /eth/v4/validator/blocks call. Only works with `--%s`", BeaconRESTApiProviderFlag.Name),
 		Value: false,
 	}
 	// DisableDutiesPolling disables the polling of duties on dependent root changes.

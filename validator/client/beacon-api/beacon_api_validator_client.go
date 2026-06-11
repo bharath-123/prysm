@@ -30,6 +30,20 @@ type beaconApiValidatorClient struct {
 	beaconBlockConverter    BeaconBlockConverter
 	prysmChainClient        iface.PrysmChainClient
 	isEventStreamRunning    bool
+	stateless               bool
+	envelopeCache           *executionPayloadEnvelopeCache
+}
+
+// WithStateless configures the validator client to use the Gloas stateless block production path,
+// retrieving the block and execution payload envelope in a single v4 call and caching the envelope
+// for reuse by the self-build publisher.
+func WithStateless(enabled bool) ValidatorClientOpt {
+	return func(c *beaconApiValidatorClient) {
+		c.stateless = enabled
+		if enabled {
+			c.envelopeCache = newExecutionPayloadEnvelopeCache()
+		}
+	}
 }
 
 func NewBeaconApiValidatorClient(provider rest.RestConnectionProvider, opts ...ValidatorClientOpt) iface.ValidatorClient {
@@ -260,6 +274,13 @@ func (c *beaconApiValidatorClient) SubmitValidatorRegistrations(ctx context.Cont
 // once the beacon API endpoint is available (lodekeeper/beacon-APIs#1).
 func (c *beaconApiValidatorClient) SubmitSignedProposerPreferences(_ context.Context, in *ethpb.SubmitSignedProposerPreferencesRequest) (*empty.Empty, error) {
 	log.WithField("count", len(in.GetSignedProposerPreferences())).Debug("SubmitSignedProposerPreferences not yet implemented, skipping")
+	return new(empty.Empty), nil
+}
+
+// TODO(gloas): Wire up actual REST call to POST /eth/v1/validator/builder_preferences
+// once the beacon API endpoint is available.
+func (c *beaconApiValidatorClient) SubmitBuilderPreferences(_ context.Context, in *ethpb.SubmitBuilderPreferencesRequest) (*empty.Empty, error) {
+	log.WithField("count", len(in.GetPreferences())).Debug("SubmitBuilderPreferences not yet implemented, skipping")
 	return new(empty.Empty), nil
 }
 
