@@ -300,13 +300,61 @@ type SSZQueryRequest struct {
 // ActiveBlobStreamingTicket is a single ticket as exposed via the Heze
 // blob-streaming active-tickets endpoint.
 type ActiveBlobStreamingTicket struct {
-	TicketID    string `json:"ticket_id"`
-	TargetSlot  string `json:"target_slot"`
-	Owner       string `json:"owner"`
-	BLSPubkey   string `json:"bls_pubkey"`
-	BlobCount   string `json:"blob_count"`
+	TicketID   string `json:"ticket_id"`
+	TargetSlot string `json:"target_slot"`
+	Owner      string `json:"owner"`
+	BLSPubkey  string `json:"bls_pubkey"`
+	BlobCount  string `json:"blob_count"`
 }
 
 type GetActiveBlobStreamingTicketsResponse struct {
 	Data []*ActiveBlobStreamingTicket `json:"data"`
+}
+
+// SubmitAotBlobsRequest is the body of the Heze blob-streaming AOT blob
+// submission endpoint. A submitter provides the full blobs (with their KZG
+// commitments and cell proofs) for a single active ticket; the node converts
+// them to AOT data columns, stages them, and propagates them to peers.
+type SubmitAotBlobsRequest struct {
+	// TicketID is the active ticket the blobs are submitted under.
+	TicketID string `json:"ticket_id"`
+	// BlobInfoSignature is the ticket owner's BLS signature (96 bytes, hex) over
+	// the AOTBlobInfo reconstructed from TicketID, the ticket's target slot, and
+	// the submitted KZG commitments.
+	BlobInfoSignature string `json:"blob_info_signature"`
+	// Blobs is the set of blobs in the bundle, in commitment order.
+	Blobs []*AotBlobInput `json:"blobs"`
+}
+
+// AotDataColumnCacheBundle is a cell-free view of one staged AOT bundle, exposed by
+// the debugging endpoint that dumps the AOT data column cache.
+type AotDataColumnCacheBundle struct {
+	// CommitmentsRoot is the bundle key (HTR of the KZG commitment list), hex.
+	CommitmentsRoot string `json:"commitments_root"`
+	// TicketID is the ticket the columns were submitted under.
+	TicketID string `json:"ticket_id"`
+	// TargetSlot is the slot the bundle's blobs target.
+	TargetSlot string `json:"target_slot"`
+	// BlobCount is the number of blobs (KZG commitments) in the bundle.
+	BlobCount string `json:"blob_count"`
+	// Commitments are the bundle's blob KZG commitments, hex-encoded.
+	Commitments []string `json:"commitments"`
+	// StoredColumnIndices are the column indices currently staged for the bundle.
+	StoredColumnIndices []string `json:"stored_column_indices"`
+}
+
+type GetAotDataColumnsResponse struct {
+	Data []*AotDataColumnCacheBundle `json:"data"`
+}
+
+// AotBlobInput is a single full blob plus the cryptographic material needed to
+// build its share of every AOT data column.
+type AotBlobInput struct {
+	// Blob is the full blob (BytesPerBlob), hex-encoded.
+	Blob string `json:"blob"`
+	// KzgCommitment is the blob's KZG commitment (48 bytes), hex-encoded.
+	KzgCommitment string `json:"kzg_commitment"`
+	// KzgCellProofs are the per-cell KZG proofs (NumberOfColumns proofs, 48 bytes
+	// each), hex-encoded, ordered by cell/column index.
+	KzgCellProofs []string `json:"kzg_cell_proofs"`
 }

@@ -1146,6 +1146,7 @@ func (s *Service) prysmBeaconEndpoints(
 		Broadcaster:           s.cfg.Broadcaster,
 		BlobReceiver:          s.cfg.BlobReceiver,
 		TicketCache:           s.cfg.TicketCache,
+		AotDataColumnCache:    s.cfg.AotDataColumnCache,
 	}
 
 	const namespace = "prysm.beacon"
@@ -1243,6 +1244,27 @@ func (s *Service) prysmBeaconEndpoints(
 				middleware.AcceptEncodingHeaderHandler(),
 			},
 			handler: server.GetActiveBlobStreamingTickets,
+			methods: []string{http.MethodGet},
+		},
+		{
+			template: "/prysm/v1/beacon/blob_streaming/aot_blobs",
+			name:     namespace + ".SubmitAotBlobs",
+			middleware: []middleware.Middleware{
+				middleware.AcceptHeaderHandler([]string{api.JsonMediaType}),
+				middleware.ContentTypeHandler([]string{api.JsonMediaType}),
+				middleware.AcceptEncodingHeaderHandler(),
+			},
+			handler: server.SubmitAotBlobs,
+			methods: []string{http.MethodPost},
+		},
+		{
+			template: "/prysm/v1/beacon/blob_streaming/aot_data_columns",
+			name:     namespace + ".GetAotDataColumns",
+			middleware: []middleware.Middleware{
+				middleware.AcceptHeaderHandler([]string{api.JsonMediaType}),
+				middleware.AcceptEncodingHeaderHandler(),
+			},
+			handler: server.GetAotDataColumns,
 			methods: []string{http.MethodGet},
 		},
 	}

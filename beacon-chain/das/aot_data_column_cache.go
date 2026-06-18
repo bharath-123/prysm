@@ -1,6 +1,7 @@
 package das
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/OffchainLabs/prysm/v7/async/event"
@@ -50,7 +51,7 @@ type AotDataColumnsIdent struct {
 // commitment lists (bid.aot_blob_kzg_commitments); the key is the HTR of each list.
 //
 // TODO - The AotDataColumnCache must be persisted in disk to survive node restarts since
-// the DA check for AOT data columns is important for attesters. 
+// the DA check for AOT data columns is important for attesters.
 type AotDataColumnCache struct {
 	mu      sync.RWMutex
 	bundles map[aotBundleKey]*aotBundle
@@ -219,6 +220,50 @@ func (c *AotDataColumnCache) AvailableAotBlobVersionedHashes(requiredCustody map
 			hashes[i] = h[:]
 		}
 		out = append(out, hashes)
+	}
+	return out
+}
+
+// AotBundleSummary is a read-only, cell-free snapshot of one staged AOT bundle,
+// for debugging/introspection. It deliberately omits the column cell data (which is
+// large) and exposes only the bundle's identity, ticket, target slot, commitments,
+// and which column indices have been stashed so far.
+type AotBundleSummary struct {
+	// CommitmentsRoot is the bundle key: the HTR of the KZG commitment list.
+	CommitmentsRoot [32]byte
+	// TicketID is the ticket the bundle's columns were submitted under (0 if no
+	// columns are stashed, which should not happen for a present bundle).
+	TicketID uint64
+	// TargetSlot is the slot the bundle's blobs target.
+	TargetSlot primitives.Slot
+	// Commitments are the bundle's blob KZG commitments, in order.
+	Commitments [][]byte
+	// StoredIndices are the column indices currently stashed for the bundle, sorted.
+	StoredIndices []uint64
+}
+
+// Summaries returns a cell-free snapshot of every staged bundle, for debugging. The
+// outer order is unspecified (map iteration); each bundle's StoredIndices are sorted.
+func (c *AotDataColumnCache) Summaries() []AotBundleSummary {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	out := make([]AotBundleSummary, 0, len(c.bundles))
+	for key, bundle := range c.bundles {
+		indices := make([]uint64, 0, len(bundle.columns))
+		var ticketID uint64
+		for idx, sidecar := range bundle.columns {
+			indices = append(indices, idx)
+			ticketID = sidecar.GetTicketId()
+		}
+		sort.Slice(indices, func(i, j int) bool { return indices[i] < indices[j] })
+		out = append(out, AotBundleSummary{
+			CommitmentsRoot: key,
+			TicketID:        ticketID,
+			TargetSlot:      bundle.targetSlot,
+			Commitments:     bundle.commitments,
+			StoredIndices:   indices,
+		})
 	}
 	return out
 }

@@ -259,6 +259,12 @@ func (p *TestP2P) BroadcastDataColumnSidecars(context.Context, []blocks.Verified
 	return nil
 }
 
+// BroadcastAotDataColumnSidecar records the broadcast.
+func (p *TestP2P) BroadcastAotDataColumnSidecar(context.Context, uint64, *ethpb.AOTDataColumnSidecar) error {
+	p.BroadcastCalled.Store(true)
+	return nil
+}
+
 // SetStreamHandler for RPC.
 func (p *TestP2P) SetStreamHandler(topic string, handler network.StreamHandler) {
 	p.BHost.SetStreamHandler(protocol.ID(topic), handler)

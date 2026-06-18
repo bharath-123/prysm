@@ -178,6 +178,11 @@ func (*FakeP2P) BroadcastDataColumnSidecars(_ context.Context, _ []blocks.Verifi
 	return nil
 }
 
+// BroadcastAotDataColumnSidecar -- fake.
+func (*FakeP2P) BroadcastAotDataColumnSidecar(_ context.Context, _ uint64, _ *ethpb.AOTDataColumnSidecar) error {
+	return nil
+}
+
 // InterceptPeerDial -- fake.
 func (*FakeP2P) InterceptPeerDial(peer.ID) (allow bool) {
 	return true

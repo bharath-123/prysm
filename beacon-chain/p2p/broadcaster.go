@@ -296,6 +296,64 @@ func (s *Service) internalBroadcastBlob(ctx context.Context, subnet uint64, blob
 	}
 }
 
+// BroadcastAotDataColumnSidecar broadcasts a single AOT (ahead-of-time) data column
+// sidecar to the p2p network on the given subnet for the current fork. It is the AOT
+// counterpart to BroadcastBlob: non-blocking, attempting to discover a subnet peer first
+// if none is available.
+func (s *Service) BroadcastAotDataColumnSidecar(ctx context.Context, subnet uint64, sidecar *ethpb.AOTDataColumnSidecar) error {
+	ctx, span := trace.StartSpan(ctx, "p2p.BroadcastAotDataColumnSidecar")
+	defer span.End()
+	if sidecar == nil {
+		return errors.New("attempted to broadcast nil AOT data column sidecar")
+	}
+	forkDigest, err := s.currentForkDigest()
+	if err != nil {
+		err := errors.Wrap(err, "could not retrieve fork digest")
+		tracing.AnnotateError(span, err)
+		return err
+	}
+
+	// Non-blocking broadcast, with attempts to discover a subnet peer if none available.
+	go s.internalBroadcastAotDataColumnSidecar(ctx, subnet, sidecar, forkDigest)
+
+	return nil
+}
+
+func (s *Service) internalBroadcastAotDataColumnSidecar(ctx context.Context, subnet uint64, sidecar *ethpb.AOTDataColumnSidecar, forkDigest [fieldparams.VersionLength]byte) {
+	_, span := trace.StartSpan(ctx, "p2p.internalBroadcastAotDataColumnSidecar")
+	defer span.End()
+	ctx = trace.NewContext(context.Background(), span) // clear parent context / deadline.
+
+	oneSlot := time.Duration(params.BeaconConfig().SecondsPerSlot) * time.Second
+	ctx, cancel := context.WithTimeout(ctx, oneSlot)
+	defer cancel()
+
+	wrappedSubIdx := subnet + aotDataColumnSubnetVal
+	s.subnetLocker(wrappedSubIdx).RLock()
+	hasPeer := s.hasPeerWithSubnet(aotDataColumnSubnetToTopic(subnet, forkDigest))
+	s.subnetLocker(wrappedSubIdx).RUnlock()
+
+	if !hasPeer {
+		if err := func() error {
+			s.subnetLocker(wrappedSubIdx).Lock()
+			defer s.subnetLocker(wrappedSubIdx).Unlock()
+
+			if err := s.FindAndDialPeersWithSubnets(ctx, AotDataColumnSubnetTopicFormat, forkDigest, minimumPeersPerSubnetForBroadcast, map[uint64]bool{subnet: true}); err != nil {
+				return errors.Wrap(err, "find peers with subnets")
+			}
+			return nil
+		}(); err != nil {
+			log.WithError(err).Error("Failed to find peers")
+			tracing.AnnotateError(span, err)
+		}
+	}
+
+	if err := s.broadcastObject(ctx, sidecar, aotDataColumnSubnetToTopic(subnet, forkDigest)); err != nil {
+		log.WithError(err).Error("Failed to broadcast AOT data column sidecar")
+		tracing.AnnotateError(span, err)
+	}
+}
+
 func (s *Service) BroadcastLightClientOptimisticUpdate(ctx context.Context, update interfaces.LightClientOptimisticUpdate) error {
 	ctx, span := trace.StartSpan(ctx, "p2p.BroadcastLightClientOptimisticUpdate")
 	defer span.End()
@@ -672,4 +730,8 @@ func lcFinalityToTopic(forkDigest [4]byte) string {
 
 func dataColumnSubnetToTopic(subnet uint64, forkDigest [fieldparams.VersionLength]byte) string {
 	return fmt.Sprintf(DataColumnSubnetTopicFormat, forkDigest, subnet)
+}
+
+func aotDataColumnSubnetToTopic(subnet uint64, forkDigest [fieldparams.VersionLength]byte) string {
+	return fmt.Sprintf(AotDataColumnSubnetTopicFormat, forkDigest, subnet)
 }

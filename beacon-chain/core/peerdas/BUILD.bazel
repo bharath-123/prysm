@@ -3,6 +3,7 @@ load("@prysm//tools/go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "aot_data_columns.go",
         "das_core.go",
         "info.go",
         "metrics.go",
@@ -41,6 +42,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "aot_data_columns_test.go",
         "das_core_test.go",
         "info_test.go",
         "p2p_interface_test.go",

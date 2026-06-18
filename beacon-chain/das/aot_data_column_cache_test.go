@@ -161,6 +161,31 @@ func TestAotDataColumnCache_AvailableAotBlobVersionedHashes(t *testing.T) {
 	require.Equal(t, 0, len(c.AvailableAotBlobVersionedHashes(map[uint64]bool{3: true})))
 }
 
+func TestAotDataColumnCache_Summaries(t *testing.T) {
+	c := NewAotDataColumnCache()
+	require.Equal(t, 0, len(c.Summaries()))
+
+	commits := [][]byte{aotTestCommitment(1), aotTestCommitment(2)}
+	key, err := ssz.KzgCommitmentsRoot(commits)
+	require.NoError(t, err)
+
+	// Stash out of order; the summary's indices must come back sorted.
+	for _, idx := range []uint64{5, 0, 2} {
+		sidecar := aotTestSidecar(idx, 10, commits)
+		sidecar.TicketId = 42
+		require.NoError(t, c.Stash(sidecar))
+	}
+
+	summaries := c.Summaries()
+	require.Equal(t, 1, len(summaries))
+	s := summaries[0]
+	require.Equal(t, key, s.CommitmentsRoot)
+	require.Equal(t, uint64(42), s.TicketID)
+	require.Equal(t, primitives.Slot(10), s.TargetSlot)
+	require.DeepEqual(t, commits, s.Commitments)
+	require.DeepEqual(t, []uint64{0, 2, 5}, s.StoredIndices)
+}
+
 func TestAotDataColumnCache_SubscribeNotifiesOnStash(t *testing.T) {
 	c := NewAotDataColumnCache()
 	commits := [][]byte{aotTestCommitment(8)}

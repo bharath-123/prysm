@@ -17,6 +17,7 @@ import (
 	blockfeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/block"
 	opfeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/operation"
 	statefeed "github.com/OffchainLabs/prysm/v7/beacon-chain/core/feed/state"
+	"github.com/OffchainLabs/prysm/v7/beacon-chain/das"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/db/filesystem"
 	"github.com/OffchainLabs/prysm/v7/beacon-chain/execution"
@@ -135,6 +136,7 @@ type Config struct {
 	LCStore                          *lightClient.Store
 	GraffitiInfo                     *execution.GraffitiInfo
 	TicketCache                      *ticketcache.Cache
+	AotDataColumnCache               *das.AotDataColumnCache
 }
 
 // NewService instantiates a new RPC service instance that will

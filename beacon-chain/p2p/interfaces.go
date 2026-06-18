@@ -54,6 +54,7 @@ type (
 		BroadcastLightClientOptimisticUpdate(ctx context.Context, update interfaces.LightClientOptimisticUpdate) error
 		BroadcastLightClientFinalityUpdate(ctx context.Context, update interfaces.LightClientFinalityUpdate) error
 		BroadcastDataColumnSidecars(ctx context.Context, sidecars []blocks.VerifiedRODataColumn) error
+		BroadcastAotDataColumnSidecar(ctx context.Context, subnet uint64, sidecar *ethpb.AOTDataColumnSidecar) error
 	}
 
 	// SetStreamHandler configures p2p to handle streams of a certain topic ID.

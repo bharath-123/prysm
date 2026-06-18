@@ -59,6 +59,12 @@ const blobSubnetLockerVal = 110
 // chosen more than sync, attestation and blob subnet (6) combined.
 const dataColumnSubnetVal = 150
 
+// The value used with the AOT (ahead-of-time) data column sidecar subnet, to
+// create an appropriate key to retrieve the relevant lock. Chosen above the JIT
+// data column subnet range (dataColumnSubnetVal + NUMBER_OF_COLUMNS) so AOT and
+// JIT column subnet locks never collide.
+const aotDataColumnSubnetVal = 300
+
 const errSavingSequenceNumber = "saving sequence number after updating subnets: %w"
 
 // nodeFilter returns a function that filters nodes based on the subnet topic and subnet index.

@@ -94,6 +94,11 @@ func (mb *mockBroadcaster) BroadcastDataColumnSidecars(_ context.Context, _ []bl
 	return nil
 }
 
+func (mb *mockBroadcaster) BroadcastAotDataColumnSidecar(_ context.Context, _ uint64, _ *ethpb.AOTDataColumnSidecar) error {
+	mb.broadcastCalled = true
+	return nil
+}
+
 func (mb *mockBroadcaster) BroadcastForEpoch(_ context.Context, _ proto.Message, _ primitives.Epoch) error {
 	mb.broadcastCalled = true
 	return nil

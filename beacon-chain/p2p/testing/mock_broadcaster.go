@@ -78,6 +78,12 @@ func (m *MockBroadcaster) BroadcastDataColumnSidecars(context.Context, []blocks.
 	return nil
 }
 
+// BroadcastAotDataColumnSidecar broadcasts an AOT data column for mock.
+func (m *MockBroadcaster) BroadcastAotDataColumnSidecar(context.Context, uint64, *ethpb.AOTDataColumnSidecar) error {
+	m.BroadcastCalled.Store(true)
+	return nil
+}
+
 // NumMessages returns the number of messages broadcasted.
 func (m *MockBroadcaster) NumMessages() int {
 	m.msgLock.Lock()
