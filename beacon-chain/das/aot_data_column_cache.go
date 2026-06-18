@@ -1,7 +1,7 @@
 package das
 
 import (
-	"sort"
+	"slices"
 	"sync"
 
 	"github.com/OffchainLabs/prysm/v7/async/event"
@@ -256,7 +256,7 @@ func (c *AotDataColumnCache) Summaries() []AotBundleSummary {
 			indices = append(indices, idx)
 			ticketID = sidecar.GetTicketId()
 		}
-		sort.Slice(indices, func(i, j int) bool { return indices[i] < indices[j] })
+		slices.Sort(indices)
 		out = append(out, AotBundleSummary{
 			CommitmentsRoot: key,
 			TicketID:        ticketID,
