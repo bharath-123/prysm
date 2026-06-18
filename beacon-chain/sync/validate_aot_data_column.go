@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// validateAotDataColumn is the gossip validator for the aot_data_column_sidecar_{subnet_id} topic
+// validateAotDataColumn is the gossip validator for the aot_data_{subnet_id} topic
 // (blob streaming, Heze). It currently performs NO validation beyond decoding and type-checking the
 // message: the structure is wired first, and the AotDataColumnVerifier (ticket validity, target-slot
 // match, blob_info signature, structural/KZG checks, subnet, dedup) is added in a follow-up.

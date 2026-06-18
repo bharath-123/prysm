@@ -502,7 +502,7 @@ message DataColumnSidecarGloas {
 
 // AOTDataColumnSidecar carries a single data column for an AOT (ahead-of-time)
 // blob submission, introduced by the Blob Streaming EIP. It is propagated on the
-// `aot_data_column_sidecar_{subnet_id}` subnet by ticket holders ahead of block
+// `aot_data_{subnet_id}` subnet by ticket holders ahead of block
 // time. Unlike DataColumnSidecarGloas (the merged, block-bound stored form), this
 // sidecar carries its own kzg_commitments plus the ticket identity (ticket_id,
 // target_slot) and the BLS signature over the original AOTBlobInfo.

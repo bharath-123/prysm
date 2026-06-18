@@ -47,10 +47,10 @@ const (
 	// GossipDataColumnSidecarMessage is the name for the data column sidecar message type.
 	GossipDataColumnSidecarMessage = "data_column_sidecar"
 	// GossipAotDataColumnSidecarMessage is the name for the ahead-of-time (AOT) data column
-	// sidecar message type (blob streaming). Note: this string contains
-	// GossipDataColumnSidecarMessage as a substring, so any strings.Contains check against the
-	// JIT message name must order the AOT case first.
-	GossipAotDataColumnSidecarMessage = "aot_data_column_sidecar"
+	// sidecar message type (blob streaming). The wire name is deliberately "aot_data" rather
+	// than "aot_data_column_sidecar" so that it does not contain GossipDataColumnSidecarMessage
+	// as a substring, keeping strings.Contains checks against the JIT message name unambiguous.
+	GossipAotDataColumnSidecarMessage = "aot_data"
 	// GossipPayloadAttestationMessageMessage is the name for the payload attestation message type.
 	GossipPayloadAttestationMessageMessage = "payload_attestation_message"
 	// GossipExecutionPayloadEnvelopeMessage is the name for the execution payload envelope message type.

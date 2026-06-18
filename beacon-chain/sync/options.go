@@ -184,7 +184,7 @@ func WithDataColumnStorage(b *filesystem.DataColumnStorage) Option {
 }
 
 // WithAotDataColumnCache gives the sync package the AOT data column staging cache that the
-// aot_data_column_sidecar gossip subscriber writes validated sidecars into.
+// aot_data gossip subscriber writes validated sidecars into.
 func WithAotDataColumnCache(c aotColumnStasher) Option {
 	return func(s *Service) error {
 		s.cfg.aotDataColumnCache = c
