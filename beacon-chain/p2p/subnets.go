@@ -76,6 +76,9 @@ func (s *Service) nodeFilter(topic string, indices map[uint64]int) (func(node *e
 		return s.filterPeerForSyncSubnet(indices), nil
 	case strings.Contains(topic, GossipBlobSidecarMessage):
 		return s.filterPeerForBlobSubnet(indices), nil
+	case strings.Contains(topic, GossipAotDataColumnSidecarMessage):
+		// AOT data column sidecars (blob streaming) reuse the JIT data column subnet mapping.
+		return s.filterPeerForDataColumnsSubnet(indices), nil
 	case strings.Contains(topic, GossipDataColumnSidecarMessage):
 		return s.filterPeerForDataColumnsSubnet(indices), nil
 	default:

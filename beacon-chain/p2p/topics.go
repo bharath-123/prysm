@@ -225,6 +225,13 @@ func (s *Service) allTopics() []topic {
 		// Set subnet to max value, allSubnetsBelow will iterate every index up to that value.
 		top := newSubnetTopic(entry.Epoch, end, entry.ForkDigest, message, subnets)
 		fullTopics = appendSubnetsBelow(top, entry.ForkDigest, fullTopics)
+
+		// AOT data column sidecar subnet topics (blob streaming, Gloas onwards). They reuse the
+		// JIT data column subnet mapping, so they live on the same subnet indices and count.
+		if entry.Epoch >= gloas {
+			aotTop := newSubnetTopic(entry.Epoch, end, entry.ForkDigest, GossipAotDataColumnSidecarMessage, cfg.DataColumnSidecarSubnetCount)
+			fullTopics = appendSubnetsBelow(aotTop, entry.ForkDigest, fullTopics)
+		}
 		end = entry.Epoch // These topics / subnet structures are mutually exclusive, so set each end to the next highest entry.
 	}
 	return fullTopics
