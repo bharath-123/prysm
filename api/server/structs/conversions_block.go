@@ -2944,6 +2944,15 @@ func ExecutionPayloadBidFromConsensus(b *eth.ExecutionPayloadBid) *ExecutionPayl
 	for i := range b.BlobKzgCommitments {
 		blobKzgCommitments[i] = hexutil.Encode(b.BlobKzgCommitments[i])
 	}
+	aotBlobKzgCommitments := make([][]string, len(b.AotBlobKzgCommitments))
+	for i, list := range b.AotBlobKzgCommitments {
+		commitments := list.GetKzgCommitments()
+		encoded := make([]string, len(commitments))
+		for j, commitment := range commitments {
+			encoded[j] = hexutil.Encode(commitment)
+		}
+		aotBlobKzgCommitments[i] = encoded
+	}
 	return &ExecutionPayloadBid{
 		ParentBlockHash:       hexutil.Encode(b.ParentBlockHash),
 		ParentBlockRoot:       hexutil.Encode(b.ParentBlockRoot),
@@ -2957,6 +2966,7 @@ func ExecutionPayloadBidFromConsensus(b *eth.ExecutionPayloadBid) *ExecutionPayl
 		ExecutionPayment:      fmt.Sprintf("%d", b.ExecutionPayment),
 		BlobKzgCommitments:    blobKzgCommitments,
 		ExecutionRequestsRoot: hexutil.Encode(b.ExecutionRequestsRoot),
+		AotBlobKzgCommitments: aotBlobKzgCommitments,
 	}
 }
 
@@ -3246,6 +3256,25 @@ func (b *ExecutionPayloadBid) ToConsensus() (*eth.ExecutionPayloadBid, error) {
 	if err != nil {
 		return nil, server.NewDecodeError(err, "ExecutionRequestsRoot")
 	}
+	err = slice.VerifyMaxLength(b.AotBlobKzgCommitments, fieldparams.MaxBlobCommitmentsPerBlock)
+	if err != nil {
+		return nil, server.NewDecodeError(err, "AotBlobKzgCommitments")
+	}
+	aotBlobKzgCommitments := make([]*eth.KzgCommitmentList, len(b.AotBlobKzgCommitments))
+	for i, list := range b.AotBlobKzgCommitments {
+		if err = slice.VerifyMaxLength(list, fieldparams.MaxBlobCommitmentsPerBlock); err != nil {
+			return nil, server.NewDecodeError(err, fmt.Sprintf("AotBlobKzgCommitments[%d]", i))
+		}
+		commitments := make([][]byte, len(list))
+		for j, commitment := range list {
+			kzg, err := bytesutil.DecodeHexWithLength(commitment, fieldparams.BLSPubkeyLength)
+			if err != nil {
+				return nil, server.NewDecodeError(err, fmt.Sprintf("AotBlobKzgCommitments[%d][%d]", i, j))
+			}
+			commitments[j] = kzg
+		}
+		aotBlobKzgCommitments[i] = &eth.KzgCommitmentList{KzgCommitments: commitments}
+	}
 	return &eth.ExecutionPayloadBid{
 		ParentBlockHash:       parentBlockHash,
 		ParentBlockRoot:       parentBlockRoot,
@@ -3259,6 +3288,7 @@ func (b *ExecutionPayloadBid) ToConsensus() (*eth.ExecutionPayloadBid, error) {
 		ExecutionPayment:      primitives.Gwei(executionPayment),
 		BlobKzgCommitments:    blobKzgCommitments,
 		ExecutionRequestsRoot: executionRequestsRoot,
+		AotBlobKzgCommitments: aotBlobKzgCommitments,
 	}, nil
 }
 

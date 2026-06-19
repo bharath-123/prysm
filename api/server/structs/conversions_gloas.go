@@ -24,6 +24,15 @@ func ROExecutionPayloadBidFromConsensus(b interfaces.ROExecutionPayloadBid) *Exe
 		blobKzgCommitments = append(blobKzgCommitments, hexutil.Encode(commitment))
 	}
 	erRoot := b.ExecutionRequestsRoot()
+	aotCommitments := b.AotBlobKzgCommitments()
+	aotBlobKzgCommitments := make([][]string, len(aotCommitments))
+	for i, list := range aotCommitments {
+		encoded := make([]string, len(list))
+		for j, commitment := range list {
+			encoded[j] = hexutil.Encode(commitment)
+		}
+		aotBlobKzgCommitments[i] = encoded
+	}
 	return &ExecutionPayloadBid{
 		ParentBlockHash:       hexutil.Encode(pbh[:]),
 		ParentBlockRoot:       hexutil.Encode(pbr[:]),
@@ -37,6 +46,7 @@ func ROExecutionPayloadBidFromConsensus(b interfaces.ROExecutionPayloadBid) *Exe
 		ExecutionPayment:      fmt.Sprintf("%d", b.ExecutionPayment()),
 		BlobKzgCommitments:    blobKzgCommitments,
 		ExecutionRequestsRoot: hexutil.Encode(erRoot[:]),
+		AotBlobKzgCommitments: aotBlobKzgCommitments,
 	}
 }
 

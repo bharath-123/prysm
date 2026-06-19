@@ -509,18 +509,19 @@ func (s *SignedBlindedBeaconBlockFulu) SigString() string {
 // ----------------------------------------------------------------------------
 
 type ExecutionPayloadBid struct {
-	ParentBlockHash       string   `json:"parent_block_hash"`
-	ParentBlockRoot       string   `json:"parent_block_root"`
-	BlockHash             string   `json:"block_hash"`
-	PrevRandao            string   `json:"prev_randao"`
-	FeeRecipient          string   `json:"fee_recipient"`
-	GasLimit              string   `json:"gas_limit"`
-	BuilderIndex          string   `json:"builder_index"`
-	Slot                  string   `json:"slot"`
-	Value                 string   `json:"value"`
-	ExecutionPayment      string   `json:"execution_payment"`
-	BlobKzgCommitments    []string `json:"blob_kzg_commitments"`
-	ExecutionRequestsRoot string   `json:"execution_requests_root"`
+	ParentBlockHash       string     `json:"parent_block_hash"`
+	ParentBlockRoot       string     `json:"parent_block_root"`
+	BlockHash             string     `json:"block_hash"`
+	PrevRandao            string     `json:"prev_randao"`
+	FeeRecipient          string     `json:"fee_recipient"`
+	GasLimit              string     `json:"gas_limit"`
+	BuilderIndex          string     `json:"builder_index"`
+	Slot                  string     `json:"slot"`
+	Value                 string     `json:"value"`
+	ExecutionPayment      string     `json:"execution_payment"`
+	BlobKzgCommitments    []string   `json:"blob_kzg_commitments"`
+	ExecutionRequestsRoot string     `json:"execution_requests_root"`
+	AotBlobKzgCommitments [][]string `json:"aot_blob_kzg_commitments"`
 }
 
 type SignedExecutionPayloadBid struct {

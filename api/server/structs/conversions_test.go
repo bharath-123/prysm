@@ -394,6 +394,7 @@ func TestROExecutionPayloadBidFromConsensus(t *testing.T) {
 			ExecutionPayment:      "22",
 			BlobKzgCommitments:    []string{},
 			ExecutionRequestsRoot: hexutil.Encode(bid.ExecutionRequestsRoot),
+			AotBlobKzgCommitments: [][]string{},
 		}
 		assert.DeepEqual(t, want, got)
 	})
@@ -435,6 +436,7 @@ func TestROExecutionPayloadBidFromConsensus(t *testing.T) {
 			ExecutionPayment:      "22",
 			BlobKzgCommitments:    bkcs,
 			ExecutionRequestsRoot: hexutil.Encode(bid.ExecutionRequestsRoot),
+			AotBlobKzgCommitments: [][]string{},
 		}
 		assert.DeepEqual(t, want, got)
 	})
